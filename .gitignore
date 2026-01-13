@@ -3,7 +3,6 @@
 .pythonenv/
 secrets/
 docker-compose.override.yml
-commands
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
