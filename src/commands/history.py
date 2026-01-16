@@ -11,7 +11,8 @@ class HistoryCommand(BaseCommand):
     def clear(self, context: 'ExecutionContext'):
             context.history = []
 
-    def execute(self, args: list[str], context: 'ExecutionContext'):
+    def execute(self, args: list[str], context: 'ExecutionContext', stdin=None, stdout=None):
         if "--clear" in args:
             self.clear(context)
-        print(f"History: {context.history}")
+        if stdout:
+            stdout.write("\n".join(context.history) + "\n")

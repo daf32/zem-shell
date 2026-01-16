@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, List
 from src.commands.base import BaseCommand
-from src.errors.input import ArgumentError
+from src.errors.input_error import ArgumentError
 
 if TYPE_CHECKING:
     from src.context import ExecutionContext
@@ -10,7 +10,7 @@ class SetCommand(BaseCommand):
     help = "Set variable"
     usage = "set NAME VALUE..."
 
-    def execute(self, args: List[str], context: 'ExecutionContext') -> None:
+    def execute(self, args: List[str], context: 'ExecutionContext', stdin=None, stdout=None) -> None:
         if not args:
             raise ArgumentError(self.name, args, "expected NAME and VALUE")
         name = args[0]

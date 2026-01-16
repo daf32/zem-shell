@@ -8,6 +8,7 @@ class ExitCommand(BaseCommand):
     help = "Exit the shell"
     usage = "exit"
 
-    def execute(self, args: list[str], context: 'ExecutionContext'):
-        print("Closing shell...")
+    def execute(self, args: list[str], context: 'ExecutionContext', stdin=None, stdout=None):
+        if stdout:
+            stdout.write("Closing shell...\n")
         context.running = False

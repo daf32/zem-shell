@@ -1,6 +1,7 @@
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 import inspect
 from pathlib import Path
+import sys
 
 if TYPE_CHECKING:
     from src.context import ExecutionContext
@@ -15,6 +16,7 @@ class BaseCommand:
         file = inspect.getfile(cls)
         cls.name = Path(file).stem
 
-    def execute(self, args: List[str], context: 'ExecutionContext') -> None:
+    def execute(self, args: list[str], context: 'ExecutionContext', 
+            stdin=sys.stdin, stdout=sys.stdout) -> None:
         raise NotImplementedError
     

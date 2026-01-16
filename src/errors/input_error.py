@@ -1,8 +1,8 @@
-from src.errors.base import CLIError
+from src.errors.base_error import CLIError
 
 class InputError(CLIError):
     def __init__(self, e):
-        super().__init__(f"InputError: {e}")
+        super().__init__(str(e))
     exit_code = 2
 
 class UnknownCommandError(InputError):
@@ -12,7 +12,7 @@ class UnknownCommandError(InputError):
 class ArgumentError(InputError):
     def __init__(self, command, arguments, reason=None):
         if isinstance(arguments, list):
-            args_str = " ".join(arguments)
+            args_str = " ".join(map(str, arguments))
         else:
             args_str = str(arguments)
         
