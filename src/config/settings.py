@@ -19,19 +19,21 @@ class OperatorsConfig(BaseModel):
     escape: str = "\\"
 
 class InputSettings(BaseModel):
-    prompt: str = ">>>"
+    prompt: str = "#"
     show_full_path: bool = False
     path_depth: int = Field(default=2, ge=0)
 
 class ShellSettings(BaseModel):
     input: InputSettings = Field(default_factory=InputSettings)
 
+CONFIG_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json"))
+
 class AppConfig(BaseSettings):
     operators: OperatorsConfig = Field(default_factory=OperatorsConfig)
     settings: ShellSettings = Field(default_factory=ShellSettings)
 
     model_config = SettingsConfigDict(
-        json_file=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json")),
+        json_file=CONFIG_PATH,
         json_file_encoding='utf-8',
         extra='ignore'
     )
@@ -51,5 +53,15 @@ class AppConfig(BaseSettings):
             JsonConfigSettingsSource(settings_cls),
             env_settings,
         )
+
+# Auto-create file if it doesn't exist
+if not os.path.exists(CONFIG_PATH):
+    import json
+    _default_config = AppConfig()
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(_default_config.model_dump(), f, indent=4)
+    except Exception:
+        pass
 
 config = AppConfig()
