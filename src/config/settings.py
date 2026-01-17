@@ -43,7 +43,7 @@ class AppConfig(BaseSettings):
         init_settings,
         env_settings,
         dotenv_settings,
-        file_secret_settings,
+        file_secret_settings
     ):
         from pydantic_settings import JsonConfigSettingsSource
         return (

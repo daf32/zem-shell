@@ -18,7 +18,7 @@
         "input": {
             "prompt": "#",
             "show_full_path": false,
-            "path_depth": 2
+            "path_depth": 1
         }
     }
 }

@@ -39,13 +39,59 @@ class Shell:
         except FileNotFoundError:
             pass
 
+        if "libedit" in readline.__doc__:
+            readline.parse_and_bind("bind ^I rl_complete")
+        else:
+            readline.parse_and_bind("tab: complete")
+        
         readline.set_completer(self.complete)
-        readline.parse_and_bind("tab: complete")
+        readline.set_completer_delims(" \t\n;")
 
     def complete(self, text, state):
-        options = [cmd for cmd in self.commands.keys() if cmd.startswith(text)]
-        if state < len(options):
-            return options[state]
+        begidx = readline.get_begidx()
+        
+        # commands autocomplete
+        if begidx == 0:
+            options = [cmd for cmd in self.commands.keys() if cmd.startswith(text)]
+            if state < len(options):
+                return options[state]
+            return None
+
+        # paths autocomplete
+        try:
+            line = readline.get_line_buffer()
+            cmd_name = line.split()[0] if line.strip() else ""
+            
+            dirname = os.path.dirname(text)
+            filename = os.path.basename(text)
+            
+            search_dir = dirname if dirname else "."
+            if not os.path.isdir(search_dir):
+                return None
+
+            files = os.listdir(search_dir)
+            
+            # filter files by name
+            options = [os.path.join(dirname, f) for f in files if f.startswith(filename)]
+            
+            formatted_options = []
+            for opt in options:
+                is_dir = os.path.isdir(opt)
+                
+                # if command is 'cd', offer only directories
+                if cmd_name == "cd" and not is_dir:
+                    continue
+                    
+                if is_dir:
+                    formatted_options.append(opt + "/")
+                else:
+                    formatted_options.append(opt)
+
+            if state < len(formatted_options):
+                return formatted_options[state]
+        except Exception:
+            pass
+            
         return None
 
     def _save_history(self):
@@ -83,8 +129,6 @@ class Shell:
             else:
                 display_path = cwd
 
-        # Добавляем ~ в начало, если просили в предыдущих итерациях
-        # Или оставим как предложил пользователь: ~ PATH SYMBOL
         if display_path.startswith("~"):
             prompt = f"{display_path} {config.settings.input.prompt} {message}"
         else:
