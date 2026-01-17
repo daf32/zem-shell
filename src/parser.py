@@ -1,125 +1,125 @@
 import re
-from src.symbols import Operators
+from src.operators import Operators
 from src.errors.parser_error import ParseError, UnclosedQuoteError
 
-_VAR_OP_ESCAPED = re.escape(Operators.variable.value)
-_VAR_PATTERN = re.compile(rf'{_VAR_OP_ESCAPED}(\w+|\{{[^}}]+\}})')
-
 class Parser:
+    NORMAL, SINGLE, DOUBLE = range(3)
+
     def __init__(self, text: str, variables: dict):
         self.text = text
         self.variables = variables
 
-    def _expand_variables_in_string(self, s: str) -> str:
-        placeholder = '\0'
-        s = s.replace(f"\\{Operators.variable.value}", placeholder)
-
-        def repl(m):
-            name = m.group(1)
-            if name.startswith('{') and name.endswith('}'):
-                name = name[1:-1]
-            val = self.variables.get(name, "")
-            return str(val)
-
-        result = _VAR_PATTERN.sub(repl, s)
-        return result.replace(placeholder, Operators.variable.value)
-
-    def _split_by_pipe(self, text: str) -> list[str]:
-        NORMAL, SINGLE, DOUBLE = range(3)
-        state = NORMAL
-        parts = []
-        current = []
+    def _walk(self, text: str):
+        state = self.NORMAL
+        escaped = False
+        for ch in text:
+            yield ch, escaped, state
+            
+            if escaped:
+                escaped = False
+            elif ch == Operators.escape.value and state != self.SINGLE:
+                escaped = True
+            elif state == self.NORMAL:
+                if ch == Operators.quote.value: state = self.SINGLE
+                elif ch == Operators.double_quote.value: state = self.DOUBLE
+            elif state == self.SINGLE and ch == Operators.quote.value:
+                state = self.NORMAL
+            elif state == self.DOUBLE and ch == Operators.double_quote.value:
+                state = self.NORMAL
         
-        for ch in text:
-            if state == NORMAL:
-                if ch == '|':
-                    parts.append("".join(current))
-                    current = []
-                    continue
-                elif ch == "'":
-                    state = SINGLE
-                elif ch == '"':
-                    state = DOUBLE
-            elif state == SINGLE:
-                if ch == "'":
-                    state = NORMAL
-            elif state == DOUBLE:
-                if ch == '"':
-                    state = NORMAL
-            current.append(ch)
-            
-        if current:
-            parts.append("".join(current))
-        elif text and text[-1] == '|':
-             parts.append("")
-            
-        return parts
-
-    def _get_tokens(self, text) -> list:
-        NORMAL, SINGLE, DOUBLE = range(3)
-
-        tokens: list[tuple[str, str | None]] = []
-        current: list[str] = []
-        state = NORMAL
-
-        def flush(quote=None):
-            if current:
-                tokens.append(("".join(current), quote))
-                current.clear()
-
-        for ch in text:
-            if state == NORMAL:
-                if ch.isspace():
-                    flush()
-                elif ch == "'":
-                    state = SINGLE
-                elif ch == '"':
-                    state = DOUBLE
-                else:
-                    current.append(ch)
-
-            elif state == SINGLE:
-                if ch == "'":
-                    flush("'")
-                    state = NORMAL
-                else:
-                    current.append(ch)
-
-            elif state == DOUBLE:
-                if ch == '"':
-                    flush('"')
-                    state = NORMAL
-                else:
-                    current.append(ch)
-
-        if state != NORMAL:
+        if state != self.NORMAL:
             raise UnclosedQuoteError()
 
-        flush()
+    def _split_by_pipe(self, text: str) -> list[str]:
+        segments = []
+        current = []
         
+        for ch, escaped, state in self._walk(text):
+            if not escaped and state == self.NORMAL and ch == Operators.pipe.value:
+                segments.append("".join(current))
+                current = []
+                continue
+            current.append(ch)
+            
+        segments.append("".join(current))
+        if text.strip().endswith(Operators.pipe.value):
+            raise ParseError("Empty command after pipe")
+        return segments
+
+    def _get_var_name(self, text: str, start: int) -> tuple[str, int]:
+        if start >= len(text): return "", start
+        if text[start] == Operators.variable_start.value:
+            end = text.find(Operators.variable_end.value, start)
+            if end == -1: return text[start+1:], len(text)
+            return text[start+1:end], end + 1
+        match = re.search(r'^(\w+)', text[start:])
+        if match:
+            name = match.group(1)
+            return name, start + len(name)
+        return "", start
+
+    def _tokenize(self, text: str) -> list[str]:
+        tokens = []
+        current = []
+        state = self.NORMAL
+        escaped = False
+        in_token = False
+        
+        i = 0
+        while i < len(text):
+            ch = text[i]
+            
+            if escaped:
+                current.append(ch)
+                escaped = False
+                i += 1
+                continue
+            if ch == Operators.escape.value and state != self.SINGLE:
+                escaped = True
+                in_token = True
+                i += 1
+                continue
+
+            if state == self.NORMAL:
+                if ch.isspace():
+                    if in_token:
+                        tokens.append("".join(current))
+                        current, in_token = [], False
+                elif ch == "'": 
+                    state, in_token = self.SINGLE, True
+                elif ch == '"': 
+                    state, in_token = self.DOUBLE, True
+                elif ch == Operators.variable.value:
+                    name, next_i = self._get_var_name(text, i + 1)
+                    current.append(str(self.variables.get(name, "")))
+                    i, in_token = next_i - 1, True
+                else:
+                    current.append(ch)
+                    in_token = True
+            elif state == self.SINGLE:
+                if ch == "'": state = self.NORMAL
+                else: current.append(ch)
+            elif state == self.DOUBLE:
+                if ch == '"': state = self.NORMAL
+                elif ch == Operators.variable.value:
+                    name, next_i = self._get_var_name(text, i + 1)
+                    current.append(str(self.variables.get(name, "")))
+                    i = next_i - 1
+                else: current.append(ch)
+            
+            i += 1
+            
+        if in_token:
+            tokens.append("".join(current))
         return tokens
 
     def parse(self) -> list[tuple[str, list[str]]]:
         segments = self._split_by_pipe(self.text)
         commands = []
-        
         for segment in segments:
-            tokens_raw = self._get_tokens(segment)
-            if not tokens_raw:
-                continue
-                
-            final_tokens = []
-            for tok, quote in tokens_raw:
-                if quote == "'":
-                    final = tok.replace(f"\\{Operators.variable.value}", Operators.variable.value)
-                else:
-                    final = self._expand_variables_in_string(tok)
-                final_tokens.append(final)
-            
-            if final_tokens:
-                 commands.append((final_tokens[0], final_tokens[1:]))
-
-        if not commands:
-             raise ParseError("empty command")
-
+            toks = self._tokenize(segment)
+            if toks:
+                commands.append((toks[0], toks[1:]))
+        
+        if not commands: raise ParseError("Empty command")
         return commands

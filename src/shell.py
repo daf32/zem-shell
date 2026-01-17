@@ -4,7 +4,7 @@ from src.parser import Parser
 from src.commands import load_plugins
 from src.commands.base import BaseCommand
 
-from src.symbols import Operators
+from src.operators import Operators
 
 from src.errors.base_error import CLIError
 
@@ -66,8 +66,24 @@ class Shell:
         self.context.running = False
         print("\nClosing shell...")
 
-    def input(self, message=""):
-        return input(f"{Operators.input.value} {message}")
+    def _get_input(self, message=""):
+        cwd = os.getcwd()
+        home = os.path.expanduser("~")
+
+        if cwd.startswith(home):
+            cwd = cwd.replace(home, "~")
+
+        parts = cwd.strip("/").split("/")
+        if len(parts) > 2:
+            display_path = "/".join(parts[-2:])
+        else:
+            display_path = cwd
+
+        if display_path.startswith("~"):
+            prompt = f"{display_path} {Operators.input.value} {message}"
+        else:
+            prompt = f"~ {display_path} {Operators.input.value} {message}"
+        return input(prompt)
 
     def _run_internal_command(self, command, args, stdin_fd, stdout_fd):
         """Helper to run internal command in a thread"""
@@ -102,7 +118,7 @@ class Shell:
         while self.context.running:
             try:
                 try:
-                    user_input = self.input()
+                    user_input = self._get_input()
                 except (KeyboardInterrupt, EOFError):
                     self._close_shell()
                     return

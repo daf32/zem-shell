@@ -1,18 +1,20 @@
-from typing import TYPE_CHECKING
 from src.commands.base import BaseCommand
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.context import ExecutionContext
 
+
 class HistoryCommand(BaseCommand):
     help = "Show history"
-    usage = f"history\n{'   --clear':10} - clear history"
+    usage = "history"
 
-    def clear(self, context: 'ExecutionContext'):
-            context.history = []
+    def clear(self, context: "ExecutionContext"):
+        context.history = []
 
-    def execute(self, args: list[str], context: 'ExecutionContext', stdin=None, stdout=None):
-        if "--clear" in args:
-            self.clear(context)
+    def execute(
+        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+    ):
         if stdout:
-            stdout.write("\n".join(context.history) + "\n")
+            for i in range(len(context.history)):
+                stdout.write(f"{(i + 1):3}  {context.history[i]}\n")

@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING
 from src.commands.base import BaseCommand
 from src.errors.input_error import ArgumentError
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.context import ExecutionContext
+
 
 class HelpCommand(BaseCommand):
     name = "help"
@@ -17,20 +18,22 @@ class HelpCommand(BaseCommand):
             stdout.write(f"{name:10} - {cmd.help}\n")
         stdout.write("\nType: help <command>\n")
 
-    def execute(self, args: list[str], context: 'ExecutionContext', stdin=None, stdout=None):
+    def execute(
+        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+    ):
         commands = context.commands
 
         if not args:
             if stdout:
                 self.print_commands(commands, stdout)
-            return 
-        
+            return
+
         cmd_name = args[0]
         cmd = commands.get(cmd_name)
 
         if not cmd:
             raise ArgumentError(self.name, cmd_name)
-        
+
         if stdout:
             stdout.write(f"Command: {cmd.name}\n")
             stdout.write(f"Description: {cmd.help}\n")
