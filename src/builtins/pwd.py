@@ -1,9 +1,9 @@
 import os
-from src.commands.base import BaseCommand
+from src.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.context import ExecutionContext
+    from src.core.context import ExecutionContext
 
 class PwdCommand(BaseCommand):
     help = "Print the current working directory"

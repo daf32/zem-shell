@@ -14,10 +14,9 @@
         "variable_end": "}",
         "escape": "\\"
     },
-
     "settings": {
         "input": {
-            "prompt": ">>>",
+            "prompt": "#",
             "show_full_path": false,
             "path_depth": 2
         }

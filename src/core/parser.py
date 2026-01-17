@@ -1,5 +1,5 @@
 import re
-from src.operators import Operators
+from src.config.settings import config
 from src.errors.parser_error import ParseError, UnclosedQuoteError
 
 class Parser:
@@ -17,14 +17,14 @@ class Parser:
             
             if escaped:
                 escaped = False
-            elif ch == Operators.escape.value and state != self.SINGLE:
+            elif ch == config.operators.escape and state != self.SINGLE:
                 escaped = True
             elif state == self.NORMAL:
-                if ch == Operators.quote.value: state = self.SINGLE
-                elif ch == Operators.double_quote.value: state = self.DOUBLE
-            elif state == self.SINGLE and ch == Operators.quote.value:
+                if ch == config.operators.quote: state = self.SINGLE
+                elif ch == config.operators.double_quote: state = self.DOUBLE
+            elif state == self.SINGLE and ch == config.operators.quote:
                 state = self.NORMAL
-            elif state == self.DOUBLE and ch == Operators.double_quote.value:
+            elif state == self.DOUBLE and ch == config.operators.double_quote:
                 state = self.NORMAL
         
         if state != self.NORMAL:
@@ -35,21 +35,21 @@ class Parser:
         current = []
         
         for ch, escaped, state in self._walk(text):
-            if not escaped and state == self.NORMAL and ch == Operators.pipe.value:
+            if not escaped and state == self.NORMAL and ch == config.operators.pipe:
                 segments.append("".join(current))
                 current = []
                 continue
             current.append(ch)
             
         segments.append("".join(current))
-        if text.strip().endswith(Operators.pipe.value):
+        if text.strip().endswith(config.operators.pipe):
             raise ParseError("Empty command after pipe")
         return segments
 
     def _get_var_name(self, text: str, start: int) -> tuple[str, int]:
         if start >= len(text): return "", start
-        if text[start] == Operators.variable_start.value:
-            end = text.find(Operators.variable_end.value, start)
+        if text[start] == config.operators.variable_start:
+            end = text.find(config.operators.variable_end, start)
             if end == -1: return text[start+1:], len(text)
             return text[start+1:end], end + 1
         match = re.search(r'^(\w+)', text[start:])
@@ -74,7 +74,7 @@ class Parser:
                 escaped = False
                 i += 1
                 continue
-            if ch == Operators.escape.value and state != self.SINGLE:
+            if ch == config.operators.escape and state != self.SINGLE:
                 escaped = True
                 in_token = True
                 i += 1
@@ -85,11 +85,11 @@ class Parser:
                     if in_token:
                         tokens.append("".join(current))
                         current, in_token = [], False
-                elif ch == "'": 
+                elif ch == config.operators.quote: 
                     state, in_token = self.SINGLE, True
-                elif ch == '"': 
+                elif ch == config.operators.double_quote: 
                     state, in_token = self.DOUBLE, True
-                elif ch == Operators.variable.value:
+                elif ch == config.operators.variable:
                     name, next_i = self._get_var_name(text, i + 1)
                     current.append(str(self.variables.get(name, "")))
                     i, in_token = next_i - 1, True
@@ -97,11 +97,11 @@ class Parser:
                     current.append(ch)
                     in_token = True
             elif state == self.SINGLE:
-                if ch == "'": state = self.NORMAL
+                if ch == config.operators.quote: state = self.NORMAL
                 else: current.append(ch)
             elif state == self.DOUBLE:
-                if ch == '"': state = self.NORMAL
-                elif ch == Operators.variable.value:
+                if ch == config.operators.double_quote: state = self.NORMAL
+                elif ch == config.operators.variable:
                     name, next_i = self._get_var_name(text, i + 1)
                     current.append(str(self.variables.get(name, "")))
                     i = next_i - 1

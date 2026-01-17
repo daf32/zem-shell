@@ -1,9 +1,9 @@
-from src.commands.base import BaseCommand
+from src.builtins.base import BaseCommand
 from src.errors.input_error import ArgumentError
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
-    from src.context import ExecutionContext
+    from src.core.context import ExecutionContext
 
 
 class SetCommand(BaseCommand):

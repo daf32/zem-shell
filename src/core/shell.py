@@ -1,10 +1,10 @@
-from src.context import ExecutionContext
-from src.parser import Parser
+from src.core.context import ExecutionContext
+from src.core.parser import Parser
 
-from src.commands import load_plugins
-from src.commands.base import BaseCommand
+from src.builtins import load_plugins
+from src.builtins.base import BaseCommand
 
-from src.operators import Operators
+from src.config.settings import config
 
 from src.errors.base_error import CLIError
 
@@ -73,16 +73,22 @@ class Shell:
         if cwd.startswith(home):
             cwd = cwd.replace(home, "~")
 
-        parts = cwd.strip("/").split("/")
-        if len(parts) > 2:
-            display_path = "/".join(parts[-2:])
-        else:
+        if config.settings.input.show_full_path:
             display_path = cwd
-
-        if display_path.startswith("~"):
-            prompt = f"{display_path} {Operators.input.value} {message}"
         else:
-            prompt = f"~ {display_path} {Operators.input.value} {message}"
+            parts = cwd.strip("/").split("/")
+            depth = config.settings.input.path_depth
+            if len(parts) > depth:
+                display_path = "/".join(parts[-depth:])
+            else:
+                display_path = cwd
+
+        # Добавляем ~ в начало, если просили в предыдущих итерациях
+        # Или оставим как предложил пользователь: ~ PATH SYMBOL
+        if display_path.startswith("~"):
+            prompt = f"{display_path} {config.settings.input.prompt} {message}"
+        else:
+            prompt = f"~ {display_path} {config.settings.input.prompt} {message}"
         return input(prompt)
 
     def _run_internal_command(self, command, args, stdin_fd, stdout_fd):

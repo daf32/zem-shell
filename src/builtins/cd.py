@@ -1,10 +1,10 @@
 import os
-from src.commands.base import BaseCommand
+from src.builtins.base import BaseCommand
 from src.errors.input_error import ArgumentError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.context import ExecutionContext
+    from src.core.context import ExecutionContext
 
 
 class CdCommand(BaseCommand):

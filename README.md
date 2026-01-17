@@ -1,44 +1,38 @@
 # CLI Shell
 
-A robust, extensible command-line interface shell written in Python.
+A robust, modular, and highly extensible command-line interface shell written in Python. Designed to mimic real Unix shells with advanced parsing, pipes, and a modern configuration system.
 
-## Features
+## 🌟 Key Features
 
-- **Built-in Commands**:
-  - `add`: Add numbers together.
-  - `echo`: Print arguments to stdout.
-  - `get`: Retrieve variable values.
-  - `set`: Define variables.
-  - `unset`: Remove variables.
-  - `history`: View command history.
-  - `help`: Display help information.
-  - `exit`: Exit the shell.
+- **Advanced Parser**:
+  - **Pipelines**: Execute multiple commands in a chain using `|` (e.g., `ls | grep .py`).
+  - **Quoting**: Robust support for single (`'`) and double (`"`) quotes.
+  - **Escaping**: Use backslashes (`\`) to escape special characters.
+  - **Variable Expansion**: Supports `$VAR` and `${VAR}` syntax, including environment variables.
 
-- **Variable Support**:
-  - Set variables using `set name value`.
-  - Access variables using `get name` or `$name` syntax in other commands (e.g., `echo $name`).
-  - Supports `{}` usage for variable names: `${name}`.
+- **Built-in Commands (Builtins)**:
+  - Directory Navigation: `cd`, `pwd`.
+  - Variable Management: `set`, `get`, `unset`, `export`.
+  - Utility: `echo`, `add`, `history`, `help`, `exit`.
 
-- **Persistent History**:
-  - Command history is saved to `~/.cli_shell_history` and reloaded on startup.
+- **Modern Configuration**:
+  - **Centralized Config**: All operators and shell settings are managed in a root `config.json`.
+  - **Pydantic Validation**: Robust type checking and validation for all configuration parameters.
+  - **Dynamic Prompt**: Customizable prompt showing truncated path (e.g., `~ dir1/dir2 #`) with configurable depth.
 
-- **Tab Completion**:
-  - Supports tab completion for command names.
+- **Developer Friendly**:
+  - **Modular Architecture**: Clean separation between Core, Builtins, and Config.
+  - **Persistent History**: Saved to `~/.cli_shell_history`.
+  - **Tab Completion**: Intelligent completion for commands.
 
-- **Robust Error Handling**:
-  - Clear, colored error messages for invalid arguments, unknown commands, and parsing errors.
-
-- **Customizible Symbols**:
-  - Configurable prompt and variable operators in `src/symbols.py`.
-
-## Installation
+## 🚀 Installation
 
 This project uses `uv` for dependency management.
 
 1. **Clone the repository**:
 
     ```bash
-    git clone <repository_url>
+    git clone https://github.com/daf32/MyShellCLI.git
     cd cli_shell
     ```
 
@@ -48,73 +42,89 @@ This project uses `uv` for dependency management.
     uv sync
     ```
 
-## Usage
+## 💻 Usage
 
-Run the shell using:
+Run the shell:
 
 ```bash
 uv run main.py
 ```
 
-Or directly with python if dependencies are installed:
-
-```bash
-python3 main.py
-```
-
 ### Example Session
 
 ```bash
->>> set name Anton
->>> echo Hello, $name!
-Hello, Anton!
->>> add 10 20.5
-30.5
->>> history
-  1  set name Anton
-  2  echo Hello, $name!
-  3  add 10 20.5
-  4  history
->>> exit
-Closing shell...
+# Set and use variables
+~ cli_shell >>> set name Antigravity
+~ cli_shell >>> echo "Hello, $name!"
+Hello, Antigravity!
+
+# Pipelines and Builtins
+~ cli_shell >>> help | echo
+Add numbers together.
+Change the shell working directory... (etc)
+
+# Directory Navigation
+~ cli_shell >>> cd src/core
+~ cli_shell/src/core >>> pwd
+/Users/user/projects/cli_shell/src/core
 ```
 
-## Project Structure
+## 🛠 Project Structure
 
-```
+```text
 cli_shell/
-├── main.py             # Entry point
-├── pyproject.toml      # Project configuration and dependencies
-├── README.md           # Documentation
+├── main.py             # Entry point with graceful error handling
+├── config.json         # JSON configuration (Operators & Settings)
+├── pyproject.toml      # Dependency management (pydantic-settings)
 └── src/
-    ├── context.py      # Execution context (variables, state)
-    ├── parser.py       # Command parser and tokenizer
-    ├── shell.py        # Main shell logic (loop, history, completion)
-    ├── symbols.py      # Configuration symbols (prompt, operators)
-    ├── commands/       # Command implementations
-    │   ├── base.py     # Base command class
-    │   ├── add.py
-    │   ├── echo.py
-    │   ├── ...
-    └── errors/         # Custom error classes
+    ├── core/           # Shell Engine (REPL, Parser, Context)
+    ├── builtins/       # Standard command implementations
+    │   ├── base.py     # Base class for all builtins
+    │   ├── cd.py
+    │   └── ...
+    ├── config/         # Pydantic Configuration Models
+    │   └── settings.py # Central configuration logic
+    └── errors/         # Custom exception hierarchy
 ```
 
-## Development
+## ⚙️ Configuration (`config.json`)
 
-To add a new command:
+You can customize almost everything:
 
-1. Create a new file in `src/commands/`.
-2. Inherit from `src.commands.base.BaseCommand`.
-3. Implement `execute(self, args, context)`.
-4. The command will be automatically discovered and loaded.
+```json
+{
+    "operators": {
+        "variable": "$",
+        "pipe": "|",
+        "escape": "\\"
+    },
+    "settings": {
+        "input": {
+            "prompt": ">>>",
+            "path_depth": 2,
+            "show_full_path": false
+        }
+    }
+}
+```
+
+## 👨‍💻 Development
+
+The shell uses an automated discovery system for commands. To add a new builtin:
+
+1. Create a file in `src/builtins/` (e.g., `hello.py`).
+2. Inherit from `BaseCommand` and implement `execute`.
 
 ```python
-from src.commands.base import BaseCommand
+from src.builtins.base import BaseCommand
 
-class MyCommand(BaseCommand):
-    name = "mycmd"
-    help = "Description of my command"
+class HelloCommand(BaseCommand):
+    name = "hello"
+    help = "Say hello"
 
-    def execute(self, args, context):
-        print("Hello from my command!")
+    def execute(self, args, context, stdin=None, stdout=None):
+        if stdout:
+            stdout.write("Hello, World!\n")
 ```
+
+The shell will automatically detect and register your command on the next launch.
