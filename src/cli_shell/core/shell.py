@@ -1,12 +1,12 @@
-from src.core.context import ExecutionContext
-from src.core.parser import Parser
+from cli_shell.core.context import ExecutionContext
+from cli_shell.core.parser import Parser
 
-from src.builtins import load_plugins
-from src.builtins.base import BaseCommand
+from cli_shell.builtins import load_plugins
+from cli_shell.builtins.base import BaseCommand
 
-from src.config.settings import config
+from cli_shell.config.settings import config
 
-from src.errors.base_error import CLIError
+from cli_shell.errors.base_error import CLIError
 
 from typing import Dict, Optional
 import readline

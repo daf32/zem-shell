@@ -1,8 +1,8 @@
-from src.builtins.base import BaseCommand
+from cli_shell.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.core.context import ExecutionContext
+    from cli_shell.core.context import ExecutionContext
 
 
 class HistoryCommand(BaseCommand):

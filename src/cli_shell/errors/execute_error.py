@@ -1,4 +1,4 @@
-from src.errors.base_error import CLIError
+from cli_shell.errors.base_error import CLIError
 
 class ExecutionError(CLIError):
     exit_code = 3

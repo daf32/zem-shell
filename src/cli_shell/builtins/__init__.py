@@ -1,4 +1,4 @@
-import src.builtins as builtins
+import cli_shell.builtins as builtins
 import importlib
 import pkgutil
 

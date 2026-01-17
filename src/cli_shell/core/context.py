@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from typing import Dict
-from src.builtins.base import BaseCommand
+from cli_shell.builtins.base import BaseCommand
 
 @dataclass
 class ExecutionContext: 

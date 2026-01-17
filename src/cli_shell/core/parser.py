@@ -1,6 +1,6 @@
 import re
-from src.config.settings import config
-from src.errors.parser_error import ParseError, UnclosedQuoteError
+from cli_shell.config.settings import config
+from cli_shell.errors.parser_error import ParseError, UnclosedQuoteError
 
 class Parser:
     NORMAL, SINGLE, DOUBLE = range(3)
