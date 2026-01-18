@@ -1,6 +1,15 @@
-# psh
+# Axonix
 
-A robust, modular, and highly extensible command-line interface shell written in Python. Designed to mimic real Unix shells with advanced parsing, pipes, and a modern configuration system.
+```text
+     █████╗ ██╗  ██╗ ██████╗ ███╗   ██╗██╗██╗  ██╗
+    ██╔══██╗╚██╗██╔╝██╔═══██╗████╗  ██║██║╚██╗██╔╝
+    ███████║ ╚███╔╝ ██║   ██║██╔██╗ ██║██║ ╚███╔╝ 
+    ██╔══██║ ██╔██╗ ██║   ██║██║╚██╗██║██║ ██╔██╗ 
+    ██║  ██║██╔╝ ██╗╚██████╔╝██║ ╚████║██║██╔╝ ██╗
+    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝
+```
+
+Axonix is a modular Python-based shell focused on extensibility and speed.
 
 ## 🌟 Key Features
 
@@ -22,7 +31,7 @@ A robust, modular, and highly extensible command-line interface shell written in
 
 - **Developer Friendly**:
   - **Modular Architecture**: Clean separation between Core, Builtins, and Config.
-  - **Persistent History**: Saved to `~/.psh_history`.
+  - **Persistent History**: Saved to `~/.axonix_history`.
   - **Tab Completion**: Intelligent completion for commands.
 
 ## 🚀 Installation
@@ -32,8 +41,8 @@ This project uses `uv` for dependency management.
 1. **Clone the repository**:
 
     ```bash
-    git clone https://github.com/daf32/MyShellCLI.git
-    cd psh
+    git clone https://github.com/daf32/axonix-shell.git
+    cd axonix-shell
     ```
 
 2. **Install dependencies**:
@@ -47,44 +56,40 @@ This project uses `uv` for dependency management.
 Run the shell:
 
 ```bash
-uv run main.py
+uv run ax
 ```
 
 ### Example Session
 
 ```bash
 # Set and use variables
-~ psh >>> set name Antigravity
-~ psh >>> echo "Hello, $name!"
+~ axonix >>> set name Antigravity
+~ axonix >>> echo "Hello, $name!"
 Hello, Antigravity!
 
 # Pipelines and Builtins
-~ psh >>> help | echo
+~ axonix >>> help | echo
 Add numbers together.
 Change the shell working directory... (etc)
 
 # Directory Navigation
-~ psh >>> cd src/core
-~ psh/src/core >>> pwd
-/Users/user/projects/psh/src/core
+~ axonix/src/axonix/core >>> pwd
+/Users/user/projects/axonix-shell/src/axonix/core
 ```
 
 ## 🛠 Project Structure
 
 ```text
-psh/
-├── main.py             # Entry point with graceful error handling
+axonix-shell/
 ├── config.json         # JSON configuration (Operators & Settings)
-├── pyproject.toml      # Dependency management (pydantic-settings)
+├── pyproject.toml      # Dependency management
 └── src/
-    ├── core/           # Shell Engine (REPL, Parser, Context)
-    ├── builtins/       # Standard command implementations
-    │   ├── base.py     # Base class for all builtins
-    │   ├── cd.py
-    │   └── ...
-    ├── config/         # Pydantic Configuration Models
-    │   └── settings.py # Central configuration logic
-    └── errors/         # Custom exception hierarchy
+    └── axonix/         # Core package
+        ├── main.py     # Entry point
+        ├── core/       # Shell Engine (REPL, Parser, Context)
+        ├── builtins/   # Standard command implementations
+        ├── config/     # Configuration Models
+        └── errors/     # Custom exception hierarchy
 ```
 
 ## ⚙️ Configuration (`config.json`)
@@ -112,11 +117,11 @@ You can customize almost everything:
 
 The shell uses an automated discovery system for commands. To add a new builtin:
 
-1. Create a file in `src/builtins/` (e.g., `hello.py`).
+1. Create a file in `src/axonix/builtins/` (e.g., `hello.py`).
 2. Inherit from `BaseCommand` and implement `execute`.
 
 ```python
-from src.builtins.base import BaseCommand
+from axonix.builtins.base import BaseCommand
 
 class HelloCommand(BaseCommand):
     name = "hello"

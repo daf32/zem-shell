@@ -1,12 +1,12 @@
-from psh.core.context import ExecutionContext
-from psh.core.parser import Parser
+from axonix.core.context import ExecutionContext
+from axonix.core.parser import Parser
 
-from psh.builtins import load_plugins
-from psh.builtins.base import BaseCommand
+from axonix.builtins import load_plugins
+from axonix.builtins.base import BaseCommand
 
-from psh.config.settings import config
+from axonix.config.settings import config
 
-from psh.errors.base_error import CLIError
+from axonix.errors.base_error import CLIError
 
 from typing import Dict, Optional
 import readline
@@ -17,7 +17,7 @@ import threading
 
 
 class Shell:
-    HISTORY_FILE = os.path.expanduser("~/.psh_history")
+    HISTORY_FILE = os.path.expanduser("~/.axonix_history")
 
     def __init__(self, commands: Optional[Dict[str, BaseCommand]] = None):
         self.context = ExecutionContext()

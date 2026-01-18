@@ -1,4 +1,4 @@
-from psh.errors.base_error import CLIError
+from axonix.errors.base_error import CLIError
 
 class ParseError(CLIError):
     def __init__(self, e):

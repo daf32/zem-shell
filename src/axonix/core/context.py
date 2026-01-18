@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 from typing import Dict
-from psh.builtins.base import BaseCommand
+from axonix.builtins.base import BaseCommand
 
 @dataclass
 class ExecutionContext: 

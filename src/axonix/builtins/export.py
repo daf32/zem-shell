@@ -1,10 +1,10 @@
 import os
-from psh.builtins.base import BaseCommand
-from psh.errors.input_error import ArgumentError
+from axonix.builtins.base import BaseCommand
+from axonix.errors.input_error import ArgumentError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from psh.core.context import ExecutionContext
+    from axonix.core.context import ExecutionContext
 
 
 class ExportCommand(BaseCommand):

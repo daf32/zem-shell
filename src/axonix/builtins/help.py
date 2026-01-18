@@ -1,9 +1,9 @@
-from psh.builtins.base import BaseCommand
-from psh.errors.input_error import ArgumentError
+from axonix.builtins.base import BaseCommand
+from axonix.errors.input_error import ArgumentError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from psh.core.context import ExecutionContext
+    from axonix.core.context import ExecutionContext
 
 
 class HelpCommand(BaseCommand):
@@ -12,7 +12,7 @@ class HelpCommand(BaseCommand):
     usage = "help [command]"
 
     def print_commands(self, commands, stdout):
-        stdout.write("Avalible commands:\n\n")
+        stdout.write("Available commands:\n\n")
         for name in sorted(commands):
             cmd = commands[name]
             stdout.write(f"{name:10} - {cmd.help}\n")

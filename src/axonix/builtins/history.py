@@ -1,8 +1,8 @@
-from psh.builtins.base import BaseCommand
+from axonix.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from psh.core.context import ExecutionContext
+    from axonix.core.context import ExecutionContext
 
 
 class HistoryCommand(BaseCommand):

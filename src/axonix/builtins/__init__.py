@@ -1,4 +1,4 @@
-import psh.builtins as builtins
+import axonix.builtins as builtins
 import importlib
 import pkgutil
 

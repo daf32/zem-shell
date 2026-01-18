@@ -12,7 +12,7 @@ wheels = [
 ]
 
 [[package]]
-name = "psh"
+name = "axonix"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

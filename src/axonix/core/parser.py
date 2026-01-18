@@ -1,6 +1,6 @@
 import re
-from psh.config.settings import config
-from psh.errors.parser_error import ParseError, UnclosedQuoteError
+from axonix.config.settings import config
+from axonix.errors.parser_error import ParseError, UnclosedQuoteError
 
 class Parser:
     NORMAL, SINGLE, DOUBLE = range(3)

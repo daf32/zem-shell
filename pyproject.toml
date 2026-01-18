@@ -1,14 +1,14 @@
 [project]
-name = "psh"
+name = "axonix"
 version = "0.1.0"
-description = "Add your description here"
+description = "A neural shell written in Python"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "pydantic-settings>=2.12.0",
 ]
 [project.scripts]
-psh = "psh.main:main"
+ax = "axonix.main:main"
 
 [build-system]
 requires = ["hatchling"]
