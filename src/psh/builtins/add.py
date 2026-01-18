@@ -1,9 +1,9 @@
 from typing import TYPE_CHECKING
-from cli_shell.builtins.base import BaseCommand
-from cli_shell.errors.input_error import ArgumentError
+from psh.builtins.base import BaseCommand
+from psh.errors.input_error import ArgumentError
 
 if TYPE_CHECKING:
-    from cli_shell.core.context import ExecutionContext
+    from psh.core.context import ExecutionContext
 
 
 class AddCommand(BaseCommand):

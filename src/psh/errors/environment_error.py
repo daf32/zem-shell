@@ -1,4 +1,4 @@
-from cli_shell.errors.base_error import CLIError
+from psh.errors.base_error import CLIError
 
 class ShellEnvironmentError(CLIError):
     exit_code = 4

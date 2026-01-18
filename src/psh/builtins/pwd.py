@@ -1,9 +1,9 @@
 import os
-from cli_shell.builtins.base import BaseCommand
+from psh.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from cli_shell.core.context import ExecutionContext
+    from psh.core.context import ExecutionContext
 
 class PwdCommand(BaseCommand):
     help = "Print the current working directory"

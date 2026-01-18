@@ -1,12 +1,12 @@
-from cli_shell.core.context import ExecutionContext
-from cli_shell.core.parser import Parser
+from psh.core.context import ExecutionContext
+from psh.core.parser import Parser
 
-from cli_shell.builtins import load_plugins
-from cli_shell.builtins.base import BaseCommand
+from psh.builtins import load_plugins
+from psh.builtins.base import BaseCommand
 
-from cli_shell.config.settings import config
+from psh.config.settings import config
 
-from cli_shell.errors.base_error import CLIError
+from psh.errors.base_error import CLIError
 
 from typing import Dict, Optional
 import readline
@@ -17,7 +17,7 @@ import threading
 
 
 class Shell:
-    HISTORY_FILE = os.path.expanduser("~/.cli_shell_history")
+    HISTORY_FILE = os.path.expanduser("~/.psh_history")
 
     def __init__(self, commands: Optional[Dict[str, BaseCommand]] = None):
         self.context = ExecutionContext()
@@ -33,11 +33,12 @@ class Shell:
         self._setup_readline()
 
     def _setup_readline(self):
-        try:
-            if os.path.exists(self.HISTORY_FILE):
+        if os.path.exists(self.HISTORY_FILE):
+            try:
                 readline.read_history_file(self.HISTORY_FILE)
-        except FileNotFoundError:
-            pass
+            except Exception as e:
+                # libedit on macOS can be touchy about history formats
+                pass
 
         if "libedit" in readline.__doc__:
             readline.parse_and_bind("bind ^I rl_complete")
@@ -97,8 +98,9 @@ class Shell:
     def _save_history(self):
         try:
             readline.write_history_file(self.HISTORY_FILE)
-        except IOError as e:
-            print(f"Error saving history: {e}")
+        except Exception as e:
+            # On some systems/versions, libedit may fail with EPERM or other errors
+            pass
 
     def _collect_commands(self) -> Dict[str, BaseCommand]:
         commands = {}

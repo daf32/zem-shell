@@ -1,6 +1,6 @@
 import re
-from cli_shell.config.settings import config
-from cli_shell.errors.parser_error import ParseError, UnclosedQuoteError
+from psh.config.settings import config
+from psh.errors.parser_error import ParseError, UnclosedQuoteError
 
 class Parser:
     NORMAL, SINGLE, DOUBLE = range(3)

@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 def main():
     try:
-        from cli_shell.core.shell import Shell
+        from psh.core.shell import Shell
         shell = Shell()
         shell.run()
     except ValidationError as e:

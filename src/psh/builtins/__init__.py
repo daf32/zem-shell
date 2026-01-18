@@ -1,4 +1,4 @@
-import cli_shell.builtins as builtins
+import psh.builtins as builtins
 import importlib
 import pkgutil
 

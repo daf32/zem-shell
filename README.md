@@ -1,4 +1,4 @@
-# CLI Shell
+# psh
 
 A robust, modular, and highly extensible command-line interface shell written in Python. Designed to mimic real Unix shells with advanced parsing, pipes, and a modern configuration system.
 
@@ -22,7 +22,7 @@ A robust, modular, and highly extensible command-line interface shell written in
 
 - **Developer Friendly**:
   - **Modular Architecture**: Clean separation between Core, Builtins, and Config.
-  - **Persistent History**: Saved to `~/.cli_shell_history`.
+  - **Persistent History**: Saved to `~/.psh_history`.
   - **Tab Completion**: Intelligent completion for commands.
 
 ## 🚀 Installation
@@ -33,7 +33,7 @@ This project uses `uv` for dependency management.
 
     ```bash
     git clone https://github.com/daf32/MyShellCLI.git
-    cd cli_shell
+    cd psh
     ```
 
 2. **Install dependencies**:
@@ -54,25 +54,25 @@ uv run main.py
 
 ```bash
 # Set and use variables
-~ cli_shell >>> set name Antigravity
-~ cli_shell >>> echo "Hello, $name!"
+~ psh >>> set name Antigravity
+~ psh >>> echo "Hello, $name!"
 Hello, Antigravity!
 
 # Pipelines and Builtins
-~ cli_shell >>> help | echo
+~ psh >>> help | echo
 Add numbers together.
 Change the shell working directory... (etc)
 
 # Directory Navigation
-~ cli_shell >>> cd src/core
-~ cli_shell/src/core >>> pwd
-/Users/user/projects/cli_shell/src/core
+~ psh >>> cd src/core
+~ psh/src/core >>> pwd
+/Users/user/projects/psh/src/core
 ```
 
 ## 🛠 Project Structure
 
 ```text
-cli_shell/
+psh/
 ├── main.py             # Entry point with graceful error handling
 ├── config.json         # JSON configuration (Operators & Settings)
 ├── pyproject.toml      # Dependency management (pydantic-settings)
