@@ -1,0 +1,18 @@
+# Axonix Shell Configuration File
+
+# Welcome Logo
+echo "     █████╗ ██╗  ██╗ ██████╗ ███╗   ██╗██╗██╗  ██╗"
+echo "    ██╔══██╗╚██╗██╔╝██╔═══██╗████╗  ██║██║╚██╗██╔╝"
+echo "    ███████║ ╚███╔╝ ██║   ██║██╔██╗ ██║██║ ╚███╔╝ "
+echo "    ██╔══██║ ██╔██╗ ██║   ██║██║╚██╗██║██║ ██╔██╗ "
+echo "    ██║  ██║██╔╝ ██╗╚██████╔╝██║ ╚████║██║██╔╝ ██╗"
+echo "    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝"
+
+# Default Aliases
+alias l='ls -la'
+alias ..='cd ..'
+alias gs='git status'
+alias help='help'
+
+# Environment Variables
+set SHELL axonix

@@ -11,11 +11,16 @@ class BaseCommand:
     name: str = ""
     help: str = ""
     usage: str = ""
+    tags: list[str] = ["builtin"]
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         file = inspect.getfile(cls)
         cls.name = Path(file).stem
+        
+        # Auto-register command
+        from axonix.builtins.registry import CommandRegistry
+        CommandRegistry.register(cls)
 
     def execute(self, args: list[str], context: "ExecutionContext", 
             stdin=sys.stdin, stdout=sys.stdout) -> None:

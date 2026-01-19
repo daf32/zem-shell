@@ -28,3 +28,6 @@ class ExportCommand(BaseCommand):
             name, value = arg.split("=", 1)
             context.variables[name] = value
             os.environ[name] = value
+            # Sync to context (though it's already updated above)
+            # This ensures consistency
+            context.sync_to_environment()

@@ -7,7 +7,8 @@ if TYPE_CHECKING:
 
 class HistoryCommand(BaseCommand):
     help = "Show history"
-    usage = "history"
+    usage = "history [-c]"
+    tags = ["builtin"]
 
     def clear(self, context: "ExecutionContext"):
         context.history = []
@@ -15,6 +16,12 @@ class HistoryCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
+        if args and args[0] in ("-c", "--clear"):
+            self.clear(context)
+            if stdout:
+                stdout.write("history cleared\n")
+            return
+
         if stdout:
             for i in range(len(context.history)):
                 stdout.write(f"{(i + 1):3}  {context.history[i]}\n")

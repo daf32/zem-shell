@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 class AddCommand(BaseCommand):
     help = "Add numbers"
     usage = "add n1 n2 [n3 ...]"
+    tags = ["test"]
 
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None

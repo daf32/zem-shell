@@ -1,118 +1,135 @@
 from axonix.core.context import ExecutionContext
 from axonix.core.parser import Parser
+from axonix.core.executor import CommandExecutor
 
 from axonix.builtins import load_plugins
 from axonix.builtins.base import BaseCommand
+from axonix.builtins.registry import CommandRegistry
 
-from axonix.config.settings import config
+from axonix.config.settings import AppConfig
 
 from axonix.errors.base_error import CLIError
 
-from typing import Dict, Optional
-import readline
+from typing import Dict, Optional, List, Tuple
 import os
-import subprocess
+import signal
 import sys
 import threading
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style
+from prompt_toolkit.formatted_text import HTML
+
+from axonix.ui.lexer import AxonixLexer
+from axonix.ui.completer import AxonixCompleter
 
 
 class Shell:
     HISTORY_FILE = os.path.expanduser("~/.axonix_history")
-
-    def __init__(self, commands: Optional[Dict[str, BaseCommand]] = None):
+    RC_FILE = os.path.expanduser("~/.axonixrc")
+    
+    def __init__(
+        self, 
+        commands: Optional[Dict[str, BaseCommand]] = None,
+        config: Optional[AppConfig] = None
+    ):
+        self.config = config or AppConfig()
         self.context = ExecutionContext()
+        # Respect configurable paths
+        self.history_file = self.config.history.file
+        self.rc_file = self.config.rc.file
 
         if commands is None:
             load_plugins()
-            self.commands = self._collect_commands()
+            self.commands = CommandRegistry.get_all_commands()
         else:
             self.commands = commands
 
         self.context.commands = self.commands
-
-        self._setup_readline()
-
-    def _setup_readline(self):
-        if os.path.exists(self.HISTORY_FILE):
-            try:
-                readline.read_history_file(self.HISTORY_FILE)
-            except Exception as e:
-                # libedit on macOS can be touchy about history formats
-                pass
-
-        if "libedit" in readline.__doc__:
-            readline.parse_and_bind("bind ^I rl_complete")
-        else:
-            readline.parse_and_bind("tab: complete")
+        self.executor = CommandExecutor(self.context)
+        self._setup_prompt_session()
+        self._setup_signal_handlers()
         
-        readline.set_completer(self.complete)
-        readline.set_completer_delims(" \t\n;")
+        if self.config.rc.auto_create and not os.path.exists(self.rc_file):
+            self._create_default_rc()
+            
+        self._load_rc_file()
 
-    def complete(self, text, state):
-        begidx = readline.get_begidx()
+    def _create_default_rc(self):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        template_path = os.path.join(current_dir, "..", "resources", "axonixrc.default")
         
-        # commands autocomplete
-        if begidx == 0:
-            options = [cmd for cmd in self.commands.keys() if cmd.startswith(text)]
-            if state < len(options):
-                return options[state]
-            return None
-
-        # paths autocomplete
         try:
-            line = readline.get_line_buffer()
-            cmd_name = line.split()[0] if line.strip() else ""
-            
-            dirname = os.path.dirname(text)
-            filename = os.path.basename(text)
-            
-            search_dir = dirname if dirname else "."
-            if not os.path.isdir(search_dir):
-                return None
-
-            files = os.listdir(search_dir)
-            
-            # filter files by name
-            options = [os.path.join(dirname, f) for f in files if f.startswith(filename)]
-            
-            formatted_options = []
-            for opt in options:
-                is_dir = os.path.isdir(opt)
-                
-                # if command is 'cd', offer only directories
-                if cmd_name == "cd" and not is_dir:
-                    continue
-                    
-                if is_dir:
-                    formatted_options.append(opt + "/")
-                else:
-                    formatted_options.append(opt)
-
-            if state < len(formatted_options):
-                return formatted_options[state]
-        except Exception:
-            pass
-            
-        return None
-
-    def _save_history(self):
-        try:
-            readline.write_history_file(self.HISTORY_FILE)
+            if os.path.isfile(template_path):
+                import shutil
+                shutil.copy(template_path, self.rc_file)
+            else:
+                with open(self.rc_file, "w", encoding="utf-8") as f:
+                    f.write("# Axonix Shell (Minimal Config)\n")
+                    f.write("set SHELL axonix\n")
+                    f.write("alias help='help'\n")
         except Exception as e:
-            # On some systems/versions, libedit may fail with EPERM or other errors
-            pass
+            sys.stderr.write(f"Warning: Failed to create default {self.rc_file}: {e}\n")
 
-    def _collect_commands(self) -> Dict[str, BaseCommand]:
-        commands = {}
-        for cmd_class in BaseCommand.__subclasses__():
-            cmd = cmd_class()
-            commands[cmd.name] = cmd
-        return commands
+    def _load_rc_file(self):
+        if os.path.exists(self.rc_file):
+            try:
+                with open(self.rc_file, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        self._execute_line(line, add_to_history=False)
+            except Exception as e:
+                print(f"Error loading {self.rc_file}: {e}")
+
+    def _setup_prompt_session(self):
+        """Setup prompt_toolkit session with history, lexer and completer."""
+        history = FileHistory(self.history_file) if self.config.history.enable else None
+        
+        self.style = Style.from_dict({
+            'command': '#ffb86c bold',
+            'variable': '#f1fa8c',
+            'operator': '#50fa7b',
+            'comment': '#6272a4',
+            'string': '#ff79c6',
+            'path': '#8be9fd',
+            'prompt_symbol': '#ffffff bold',
+            'exit_code_ok': '#50fa7b',
+            'exit_code_err': '#ff5555',
+        })
+        
+        self.session = PromptSession(
+            history=history,
+            lexer=AxonixLexer(self.config),
+            completer=AxonixCompleter(self),
+            style=self.style,
+            complete_while_typing=True
+        )
+
+    
+    def _setup_signal_handlers(self):
+        """Setup signal handlers for graceful shutdown."""
+        def signal_handler(signum, frame):
+            """Handle SIGINT (Ctrl+C) and SIGTERM."""
+            print("\nInterrupted")
+            self.executor.cleanup_processes()
+            self._close_shell()
+            sys.exit(130 if signum == signal.SIGINT else 0)
+        
+        signal.signal(signal.SIGINT, signal_handler)
+        if hasattr(signal, 'SIGTERM'):
+            signal.signal(signal.SIGTERM, signal_handler)
+
+
 
     def _close_shell(self):
-        self._save_history()
+        """Close shell gracefully."""
+        self.executor.cleanup_processes()
+        self.context.sync_to_environment()
         self.context.running = False
-        print("\nClosing shell...")
+        print("Closing shell...")
 
     def _get_input(self, message=""):
         cwd = os.getcwd()
@@ -121,50 +138,206 @@ class Shell:
         if cwd.startswith(home):
             cwd = cwd.replace(home, "~")
 
-        if config.settings.input.show_full_path:
+        if self.config.input.show_full_path:
             display_path = cwd
         else:
             parts = cwd.strip("/").split("/")
-            depth = config.settings.input.path_depth
+            depth = self.config.input.path_depth
             if len(parts) > depth:
                 display_path = "/".join(parts[-depth:])
             else:
                 display_path = cwd
 
-        if display_path.startswith("~"):
-            prompt = f"{display_path} {config.settings.input.prompt} {message}"
+        exit_code = self.context.last_exit_code
+        show_code = self.config.input.show_exit_code
+        prompt_symbol = self.config.input.prompt
+
+        # Build formatted prompt
+        if self.config.input.color_prompt:
+            code_class = 'exit_code_ok' if exit_code == 0 else 'exit_code_err'
+            prompt_html = [
+                (f'class:{code_class}', f'{exit_code} '),
+                ('class:path', f'{display_path if display_path.startswith("~") else f"~ {display_path}"}'),
+                ('', ' '),
+                ('class:prompt_symbol', f'{prompt_symbol}'),
+                ('', ' ')
+            ]
         else:
-            prompt = f"~ {display_path} {config.settings.input.prompt} {message}"
-        return input(prompt)
+            prompt_text = f"{exit_code} " if show_code else ""
+            prompt_text += f"{display_path if display_path.startswith('~') else f'~ {display_path}'} {prompt_symbol} "
+            prompt_html = prompt_text
 
-    def _run_internal_command(self, command, args, stdin_fd, stdout_fd):
-        """Helper to run internal command in a thread"""
-        stdin = sys.stdin
-        stdout = sys.stdout
+        return self.session.prompt(prompt_html)
 
-        if stdin_fd is not None:
-            stdin = os.fdopen(stdin_fd, "r")
+    def _print_error(self, message: str):
+        sys.stderr.write(f"[error] {message}\n")
 
-        if stdout_fd is not None:
-            stdout = os.fdopen(stdout_fd, "w")
+    def _add_history(self, entry: str):
+        """Add entry to in-memory history respecting limits and settings."""
+        history_cfg = self.config.history
+        if not history_cfg.enable:
+            return
+        self.context.history.append(entry)
+        if len(self.context.history) > history_cfg.max_entries:
+            # keep only last max_entries
+            self.context.history = self.context.history[-history_cfg.max_entries:]
+
+    def _execute_line(self, user_input: str, add_to_history: bool = True):
+        """Execute a command line with proper resource management."""
+        if not user_input.strip():
+            return
+
+        if add_to_history:
+            self._add_history(user_input)
+
+        # Sync environment variables before execution
+        self.context.sync_from_environment()
 
         try:
-            command.execute(args, self.context, stdin=stdin, stdout=stdout)
-        except BrokenPipeError:
-            pass
+            pipeline = Parser(
+                user_input,
+                self.context.variables,
+                self.context.aliases,
+                self.config
+            ).parse()
+
+            processes = []
+            pipe_fds = []  # Track all pipe FDs for cleanup
+            prev_pipe_read = None
+
+            exit_code = 0
+            try:
+                for i, cmd_info in enumerate(pipeline):
+                    cmd_name = cmd_info["name"]
+                    args = cmd_info["args"]
+                    stdin_file = cmd_info["stdin_file"]
+                    stdout_file = cmd_info["stdout_file"]
+                    append = cmd_info.get("append", False)
+
+                    is_last = i == len(pipeline) - 1
+
+                    current_stdin = prev_pipe_read
+                    if i == 0:
+                        current_stdin = None
+
+                    # Handle input redirection
+                    if stdin_file:
+                        try:
+                            fd_in = os.open(stdin_file, os.O_RDONLY)
+                            if current_stdin is not None:
+                                os.close(current_stdin)
+                            current_stdin = fd_in
+                        except FileNotFoundError:
+                            self._print_error(f"no such file or directory: {stdin_file}")
+                            exit_code = 1
+                            break
+
+                    current_stdout = None
+                    pipe_write = None
+                    pipe_read = None
+
+                    if not is_last:
+                        pipe_read, pipe_write = os.pipe()
+                        pipe_fds.extend([pipe_read, pipe_write])
+                        current_stdout = pipe_write
+                    
+                    # Handle output redirection
+                    if stdout_file:
+                        try:
+                            flags = os.O_WRONLY | os.O_CREAT
+                            if append:
+                                flags |= os.O_APPEND
+                            else:
+                                flags |= os.O_TRUNC
+                            
+                            fd_out = os.open(stdout_file, flags, 0o644)
+                            if current_stdout is not None:
+                                os.close(current_stdout)
+                            current_stdout = fd_out
+                        except OSError as e:
+                            self._print_error(f"cannot open file {stdout_file}: {e}")
+                            exit_code = 1
+                            break
+
+                    command = self.commands.get(cmd_name)
+
+                    if command:
+                        # Execute builtin command
+                        # We pass duplicates because managed_fd will close them
+                        stdin_fd = os.dup(current_stdin) if current_stdin is not None else None
+                        stdout_fd = os.dup(current_stdout) if current_stdout is not None else None
+                        
+                        thread = self.executor.execute_builtin(
+                            command, args, stdin_fd, stdout_fd
+                        )
+                        processes.append(thread)
+
+                        # Close original FDs
+                        if current_stdout is not None:
+                            os.close(current_stdout)
+                        if current_stdin is not None:
+                            os.close(current_stdin)
+
+                    else:
+                        # Execute external command
+                        try:
+                            process = self.executor.execute_external(
+                                cmd_name, args, current_stdin, current_stdout
+                            )
+                            processes.append(process)
+
+                            # Close FDs (subprocess owns them now)
+                            if current_stdout is not None:
+                                os.close(current_stdout)
+                            if current_stdin is not None:
+                                os.close(current_stdin)
+
+                        except FileNotFoundError:
+                            self._print_error(f"command not found: {cmd_name}")
+                            exit_code = 127
+                            if current_stdout is not None: os.close(current_stdout)
+                            if pipe_read is not None: os.close(pipe_read)
+                            if current_stdin is not None: os.close(current_stdin)
+                            break
+                        except ValueError as e:
+                            self._print_error(f"invalid command: {e}")
+                            exit_code = 1
+                            if current_stdout is not None: os.close(current_stdout)
+                            if pipe_read is not None: os.close(pipe_read)
+                            if current_stdin is not None: os.close(current_stdin)
+                            break
+
+                    prev_pipe_read = pipe_read
+
+                # Wait for all processes to complete
+                for p in processes:
+                    if isinstance(p, threading.Thread):
+                        p.join()
+                    else:
+                        exit_code = p.wait()
+                        if exit_code != 0 and p.stderr:
+                            stderr_output = p.stderr.read().decode('utf-8', errors='ignore')
+                            if stderr_output:
+                                self._print_error(stderr_output.strip())
+
+            finally:
+                # Ensure all pipe FDs are closed
+                for fd in pipe_fds:
+                    try:
+                        os.close(fd)
+                    except OSError:
+                        pass
+
+            # Sync variables back to environment after execution
+            self.context.sync_to_environment()
+            self.context.last_exit_code = exit_code
+
+        except CLIError as e:
+            self.context.last_exit_code = getattr(e, "exit_code", 1)
+            self._print_error(str(e))
         except Exception as e:
-            sys.stderr.write(f"Error in {command.name}: {e}\n")
-        finally:
-            if stdin is not sys.stdin:
-                try:
-                    stdin.close()
-                except OSError:
-                    pass
-            if stdout is not sys.stdout:
-                try:
-                    stdout.close()
-                except OSError:
-                    pass
+            self.context.last_exit_code = 1
+            self._print_error(f"internal error: {e}")
 
     def run(self):
         while self.context.running:
@@ -175,93 +348,7 @@ class Shell:
                     self._close_shell()
                     return
 
-                if not user_input.strip():
-                    continue
-
-                self.context.history.append(user_input)
-
-                pipeline = Parser(user_input, self.context.variables).parse()
-
-                processes = []
-                prev_pipe_read = None
-
-                for i, (cmd_name, args) in enumerate(pipeline):
-                    is_last = i == len(pipeline) - 1
-
-                    current_stdin = prev_pipe_read
-                    if i == 0:
-                        current_stdin = None
-
-                    current_stdout = None
-                    pipe_write = None
-                    pipe_read = None
-
-                    if not is_last:
-                        pipe_read, pipe_write = os.pipe()
-                        current_stdout = pipe_write
-                    else:
-                        current_stdout = None
-
-                    command = self.commands.get(cmd_name)
-
-                    if command:
-                        t_stdin = (
-                            os.dup(current_stdin) if current_stdin is not None else None
-                        )
-                        t_stdout = (
-                            os.dup(current_stdout)
-                            if current_stdout is not None
-                            else None
-                        )
-
-                        t = threading.Thread(
-                            target=self._run_internal_command,
-                            args=(command, args, t_stdin, t_stdout),
-                        )
-                        t.start()
-                        processes.append(t)
-
-                        if current_stdout is not None:
-                            os.close(current_stdout)
-                        if current_stdin is not None:
-                            os.close(current_stdin)
-
-                    else:
-                        try:
-                            p = subprocess.Popen(
-                                [cmd_name] + args,
-                                stdin=current_stdin,
-                                stdout=current_stdout,
-                            )
-                            processes.append(p)
-
-                            if current_stdout is not None:
-                                os.close(current_stdout)
-                            if current_stdin is not None:
-                                os.close(current_stdin)
-
-                        except FileNotFoundError:
-                            print(f"Command not found: {cmd_name}")
-                            if current_stdout is not None:
-                                os.close(current_stdout)
-                            if pipe_read is not None:
-                                os.close(pipe_read)
-                            if current_stdin is not None:
-                                os.close(current_stdin)
-                            break
-
-                    prev_pipe_read = pipe_read
-
-                for p in processes:
-                    if isinstance(p, threading.Thread):
-                        p.join()
-                    else:
-                        p.wait()
-
-            except CLIError as e:
-                print(e)
+                self._execute_line(user_input)
 
             except Exception as e:
                 print(f"Internal error: {e}")
-
-        self._save_history()
