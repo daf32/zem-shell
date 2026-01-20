@@ -3,8 +3,17 @@ from prompt_toolkit.document import Document
 from typing import List, Tuple
 
 class AxonixLexer(Lexer):
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, shell):
+        self.shell = shell
+        self.config = shell.config
+        self._system_commands = None
+    
+    @property
+    def system_commands(self):
+        if self._system_commands is None:
+            from axonix.utils.executables import get_system_commands
+            self._system_commands = set(get_system_commands())
+        return self._system_commands
 
     def lex_document(self, document: Document):
         def get_line(lineno):
@@ -29,8 +38,24 @@ class AxonixLexer(Lexer):
                     tokens.append(("class:variable", var_name))
                     continue
                 elif char == self.config.operators.pipe:
+                    # Check for ||
+                    if i + 1 < len(line) and line[i+1] == self.config.operators.pipe:
+                        tokens.append(("class:operator", "||"))
+                        i += 2
+                        is_first_word = True
+                        continue
                     tokens.append(("class:operator", char))
                     is_first_word = True # After pipe, next word is a command
+                elif char == self.config.operators.semicolon:
+                    tokens.append(("class:operator", char))
+                    is_first_word = True # After semicolon, next word is a command
+                elif char == "&": # Background or AND
+                    if i + 1 < len(line) and line[i+1] == "&":
+                        tokens.append(("class:operator", "&&"))
+                        i += 2
+                        is_first_word = True
+                        continue
+                    tokens.append(("class:operator", char))
                 elif char in [self.config.operators.redirect_output, self.config.operators.redirect_input]:
                     # Check for >>
                     if char == self.config.operators.redirect_output and i + 1 < len(line) and line[i+1] == self.config.operators.redirect_output:

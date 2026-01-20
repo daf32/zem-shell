@@ -12,6 +12,5 @@ class ExitCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
-        if stdout:
-            stdout.write("Closing shell...\n")
+        self._write("Closing shell...\n", stdout)
         context.running = False

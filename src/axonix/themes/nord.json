@@ -1,0 +1,22 @@
+{
+    "name": "Nord",
+    "author": "Axonix Team",
+    "type": "dark",
+    "colors": {
+        "command": "#88c0d0",
+        "variable": "#ebcb8b",
+        "operator": "#81a1c1",
+        "comment": "#4c566a",
+        "string": "#a3be8c",
+        "path": "#5e81ac",
+        "prompt_symbol": "#eceff4",
+        "exit_code_ok": "#a3be8c",
+        "exit_code_err": "#bf616a",
+        "error": "#bf616a",
+        "warning": "#d08770",
+        "info": "#88c0d0",
+        "logo_primary": "#88c0d0",
+        "logo_secondary": "#5e81ac",
+        "logo_tertiary": "#4c566a"
+    }
+}

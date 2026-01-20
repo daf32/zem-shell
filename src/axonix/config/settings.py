@@ -1,7 +1,6 @@
 import os
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 class OperatorsConfig(BaseModel):
     variable: str = "$"
@@ -15,6 +14,8 @@ class OperatorsConfig(BaseModel):
     redirect_append: str = ">>"
     redirect_input: str = "<"
     background: str = "&"
+    and_if: str = "&&"
+    or_if: str = "||"
     variable_start: str = "{"
     variable_end: str = "}"
     escape: str = "\\"
@@ -23,6 +24,8 @@ class InputSettings(BaseModel):
     prompt: str = "#"
     show_full_path: bool = False
     path_depth: int = Field(default=1, ge=0)
+    show_git_info: bool = True
+    show_venv_info: bool = True
     show_exit_code: bool = True
     color_prompt: bool = True
 
@@ -37,6 +40,29 @@ class HistorySettings(BaseModel):
 class RCSettings(BaseModel):
     auto_create: bool = True
     file: str = Field(default_factory=lambda: os.path.expanduser("~/.axonixrc"))
+
+class ColorScheme(BaseModel):
+    """Color scheme for syntax highlighting and interface elements."""
+    command: str = "#ffb86c"  # Orange
+    variable: str = "#f1fa8c"  # Yellow
+    operator: str = "#50fa7b"  # Green
+    comment: str = "#6272a4"   # Gray-Blue
+    string: str = "#ff79c6"    # Pink/Magenta
+    path: str = "#8be9fd"      # Cyan
+    prompt_symbol: str = "#ffffff"  # White
+    exit_code_ok: str = "#50fa7b"   # Green
+    exit_code_err: str = "#ff5555"  # Red
+    error: str = "#ff5555"     # Red
+    warning: str = "#ffb86c"   # Orange
+    info: str = "#8be9fd"      # Cyan
+    
+    # Logo gradient colors
+    logo_primary: str = "#8be9fd"      # Cyan
+    logo_secondary: str = "#bd93f9"    # Purple
+    logo_tertiary: str = "#6272a4"     # Blue-Gray
+
+class VenvScheme(BaseModel):
+    auto: bool = True
 
 def get_config_path() -> str:
     """Get config file path, allowing override via environment variable."""
@@ -54,6 +80,9 @@ class AppConfig(BaseSettings):
     input: InputSettings = Field(default_factory=InputSettings)
     history: HistorySettings = Field(default_factory=HistorySettings)
     rc: RCSettings = Field(default_factory=RCSettings)
+    colors: ColorScheme = Field(default_factory=ColorScheme)
+    active_theme: str = "default"
+    venv: VenvScheme = Field(default_factory=VenvScheme)
 
     @field_validator("operators")
     @classmethod

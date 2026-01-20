@@ -88,6 +88,8 @@ class CommandExecutor:
                 self.logger.error(f"IO error in {command.name}: {e}")
                 sys.stderr.write(f"IO error in {command.name}: {e}\n")
         
+        # Use daemon=True so threads don't prevent shell shutdown
+        # Threads are explicitly joined in _execute_pipeline, so this is safe
         thread = threading.Thread(target=run_command, daemon=True)
         self._active_processes.append(thread)
         thread.start()
@@ -117,7 +119,6 @@ class CommandExecutor:
                 [cmd_name] + sanitized_args,
                 stdin=stdin_fd,
                 stdout=stdout_fd,
-                stderr=subprocess.PIPE,  # Capture stderr separately
             )
             self._active_processes.append(process)
             return process
@@ -126,6 +127,18 @@ class CommandExecutor:
         except ValueError as e:
             raise ValueError(f"Invalid arguments for {cmd_name}: {e}")
     
+    def clear_finished(self):
+        """Remove finished processes and threads from the active list."""
+        still_running = []
+        for p in self._active_processes:
+            if isinstance(p, subprocess.Popen):
+                if p.poll() is None:
+                    still_running.append(p)
+            elif isinstance(p, threading.Thread):
+                if p.is_alive():
+                    still_running.append(p)
+        self._active_processes = still_running
+
     def cleanup_processes(self):
         """Clean up all active processes."""
         self.logger.debug(f"Cleaning up {len(self._active_processes)} processes")

@@ -62,15 +62,34 @@ class Parser:
         return current_tokens
 
     def _split_by_pipe(self, text: str) -> list[str]:
+        """Split by pipe operator, but not || (logical OR)."""
         segments = []
         current = []
         
-        for ch, escaped, state in self._walk(text):
+        chars = list(self._walk(text))
+        i = 0
+        while i < len(chars):
+            ch, escaped, state = chars[i]
+            
             if not escaped and state == self.NORMAL and ch == self.config.operators.pipe:
+                # Check if this is part of || operator
+                if i + 1 < len(chars):
+                    next_ch, next_escaped, next_state = chars[i + 1]
+                    if next_ch == "|" and not next_escaped and next_state == self.NORMAL:
+                        # This is ||, not a pipe - add both chars and continue
+                        current.append(ch)
+                        current.append(next_ch)
+                        i += 2
+                        continue
+                
+                # This is a pipe operator
                 segments.append("".join(current))
                 current = []
+                i += 1
                 continue
+            
             current.append(ch)
+            i += 1
             
         segments.append("".join(current))
         if text.strip().endswith(self.config.operators.pipe):
@@ -83,6 +102,8 @@ class Parser:
             end = text.find(self.config.operators.variable_end, start)
             if end == -1: return text[start+1:], len(text)
             return text[start+1:end], end + 1
+        if text[start] == "?":
+            return "?", start + 1
         match = re.search(r'^(\w+)', text[start:])
         if match:
             name = match.group(1)
@@ -144,6 +165,12 @@ class Parser:
                             tokens.append(ch)
                     else:
                         tokens.append(ch)
+                elif ch == self.config.operators.background:
+                    # Background operator - should be at end of command
+                    if in_token:
+                        tokens.append("".join(current))
+                        current, in_token = [], False
+                    tokens.append(self.config.operators.background)
                 else:
                     current.append(ch)
                     in_token = True
@@ -165,11 +192,12 @@ class Parser:
         return tokens
     
     def _extract_redirections(self, tokens: list[str]):
-        """Extract redirection information from tokens."""
+        """Extract redirection and background information from tokens."""
         cmd_tokens = []
         stdin_file = None
         stdout_file = None
         append = False
+        background = False
         
         i = 0
         while i < len(tokens):
@@ -185,28 +213,104 @@ class Parser:
                     stdin_file = tokens[i + 1]
                     i += 2
                     continue
+            elif token == self.config.operators.background:
+                # Background operator should be at the end
+                background = True
+                i += 1
+                continue
             cmd_tokens.append(token)
             i += 1
-        return cmd_tokens, stdin_file, stdout_file, append
+        return cmd_tokens, stdin_file, stdout_file, append, background
+
+    def _split_logic(self, text: str) -> list[tuple[str, str]]:
+        """Split text by logic operators (&&, ||, ;) into segments."""
+        segments = []
+        current = []
+        
+        i = 0
+        chars = list(self._walk(text))
+        while i < len(chars):
+            ch, escaped, state = chars[i]
+            
+            if not escaped and state == self.NORMAL:
+                # Check for && - must check next char is also & and not escaped
+                if ch == "&" and i + 1 < len(chars):
+                    next_ch, next_escaped, next_state = chars[i + 1]
+                    if next_ch == "&" and not next_escaped and next_state == self.NORMAL:
+                        segments.append(("".join(current), "&&"))
+                        current = []
+                        i += 2
+                        continue
+                    # Single & is background operator, handled in tokenize
+                # Check for || - must check next char is also | and not escaped
+                # But also need to avoid matching pipe operator |
+                if ch == "|" and i + 1 < len(chars):
+                    next_ch, next_escaped, next_state = chars[i + 1]
+                    if next_ch == "|" and not next_escaped and next_state == self.NORMAL:
+                        segments.append(("".join(current), "||"))
+                        current = []
+                        i += 2
+                        continue
+                # Check for ;
+                if ch == self.config.operators.semicolon:
+                    segments.append(("".join(current), ";"))
+                    current = []
+                    i += 1
+                    continue
+            
+            current.append(ch)
+            i += 1
+            
+        segments.append(("".join(current), None))
+        return segments
 
     def parse(self) -> list[dict]:
-        segments = self._split_by_pipe(self.text)
-        commands = []
-        for segment in segments:
-            toks = self._tokenize(segment)
-            toks = self._expand_aliases(toks)
-            if toks:
-                args, stdin, stdout, append = self._extract_redirections(toks)
-                if not args:
-                    raise ParseError("Missing command name")
-                
-                commands.append({
-                    "name": args[0],
-                    "args": args[1:],
-                    "stdin_file": stdin,
-                    "stdout_file": stdout,
-                    "append": append
+        """
+        Returns a list of logical units.
+        Each unit is a dictionary:
+        {
+            "pipeline": list of commands,
+            "logic": "&&" | "||" | ";" | None (operator to evaluate AFTER this pipeline)
+        }
+        """
+        logic_segments = self._split_logic(self.text)
+        units = []
+        
+        for segment_text, logic_op in logic_segments:
+            if not segment_text.strip() and logic_op:
+                if not units: continue # Leading separator
+                raise ParseError(f"Empty command near {logic_op}")
+            
+            if not segment_text.strip():
+                continue
+
+            pipeline_segments = self._split_by_pipe(segment_text)
+            commands = []
+            for pipe_seg in pipeline_segments:
+                toks = self._tokenize(pipe_seg)
+                toks = self._expand_aliases(toks)
+                if toks:
+                    args, stdin, stdout, append, background = self._extract_redirections(toks)
+                    if not args:
+                        raise ParseError("Missing command name")
+                    
+                    # Background can only be on the last command in pipeline
+                    is_last = len(commands) == len(pipeline_segments) - 1
+                    
+                    commands.append({
+                        "name": args[0],
+                        "args": args[1:],
+                        "stdin_file": stdin,
+                        "stdout_file": stdout,
+                        "append": append,
+                        "background": background and is_last  # Only last command can be background
+                    })
+            
+            if commands:
+                units.append({
+                    "pipeline": commands,
+                    "logic": logic_op
                 })
         
-        if not commands: raise ParseError("Empty command")
-        return commands
+        if not units: raise ParseError("Empty command")
+        return units

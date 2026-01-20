@@ -10,5 +10,4 @@ class PwdCommand(BaseCommand):
     usage = "pwd"
 
     def execute(self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None):
-        if stdout:
-            stdout.write(os.getcwd() + "\n")
+        self._write(os.getcwd() + "\n", stdout)

@@ -14,10 +14,9 @@ class GetCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
-        if not args:
-            raise ArgumentError(self.name, "", "expected NAME")
+        self._require_args(args, min_count=1, error_msg="expected NAME")
+        
         name = args[0]
         if not context.variables.get(name):
             raise ArgumentError(self.name, name, f"variable '{name}' is not set")
-        if stdout:
-            stdout.write(str(context.variables.get(name)) + "\n")
+        self._write(str(context.variables.get(name)) + "\n", stdout)

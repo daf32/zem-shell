@@ -16,7 +16,7 @@ class ExportCommand(BaseCommand):
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
         if not args:
-            stdout.write("\n".join(f"{k}={v}" for k, v in os.environ.items()) + "\n")   
+            self._write("\n".join(f"{k}={v}" for k, v in os.environ.items()) + "\n", stdout)
             return
 
         for arg in args:

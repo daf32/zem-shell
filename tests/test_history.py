@@ -4,20 +4,18 @@ from axonix.config.settings import AppConfig
 
 def make_shell_with_history_limit(limit: int = 3):
     cfg = AppConfig(
-        settings={
-            "history": {
-                "enable": True,
-                "file": "/tmp/axonix_history_test",
-                "max_entries": limit,
-                "load_on_start": False,
-                "save_on_exit": False,
-                "rotate": True,
-            },
-            "rc": {
-                "auto_create": False,
-                "file": "/tmp/axonixrc_test",
-            },
-        }
+        history={
+            "enable": True,
+            "file": "/tmp/axonix_history_test",
+            "max_entries": limit,
+            "load_on_start": False,
+            "save_on_exit": False,
+            "rotate": True,
+        },
+        rc={
+            "auto_create": False,
+            "file": "/tmp/axonixrc_test",
+        },
     )
     return Shell(config=cfg)
 

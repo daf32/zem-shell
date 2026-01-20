@@ -8,13 +8,23 @@ def main():
         shell = Shell()
         shell.run()
     except ValidationError as e:
-        print(f"\033[91mConfiguration Error:\033[0m")
+        from prompt_toolkit import print_formatted_text, HTML
+        from axonix.utils.colors import error_tag
+        from axonix.config.settings import AppConfig
+        
+        config = AppConfig()
+        print_formatted_text(HTML(f"{error_tag(config)} Configuration Error:"))
         for error in e.errors():
             loc = ".".join(str(x) for x in error['loc'])
-            print(f"  - {loc}: {error['msg']}")
+            print_formatted_text(HTML(f"  <ansiyellow>-</ansiyellow> <ansicyan>{loc}</ansicyan>: {error['msg']}"))
         sys.exit(1)
     except Exception as e:
-        print(f"Failed to start shell: {e}")
+        from prompt_toolkit import print_formatted_text, HTML
+        from axonix.utils.colors import error_tag
+        from axonix.config.settings import AppConfig
+        
+        config = AppConfig()
+        print_formatted_text(HTML(f"{error_tag(config)} Failed to start shell: {e}"))
         sys.exit(1)
 
 if __name__ == "__main__":

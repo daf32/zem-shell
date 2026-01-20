@@ -14,7 +14,6 @@ class UnsetCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
-        if not args:
-            raise ArgumentError(self.name, "", "expected NAME")
+        self._require_args(args, min_count=1, error_msg="expected NAME")
         name = args[0]
         context.variables.pop(name, None)

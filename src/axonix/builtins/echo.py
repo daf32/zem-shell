@@ -12,5 +12,4 @@ class EchoCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
-        if stdout:
-            stdout.write(" ".join(args) + "\n")
+        self._write(" ".join(args) + "\n", stdout)

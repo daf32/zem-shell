@@ -1,0 +1,22 @@
+{
+    "name": "Minimal",
+    "author": "Axonix Team",
+    "type": "dark",
+    "colors": {
+        "command": "#ffffff",
+        "variable": "#aaaaaa",
+        "operator": "#888888",
+        "comment": "#555555",
+        "string": "#cccccc",
+        "path": "#bbbbbb",
+        "prompt_symbol": "#ffffff",
+        "exit_code_ok": "#aaaaaa",
+        "exit_code_err": "#ff5555",
+        "error": "#ff5555",
+        "warning": "#ffaa55",
+        "info": "#aaaaaa",
+        "logo_primary": "#ffffff",
+        "logo_secondary": "#aaaaaa",
+        "logo_tertiary": "#555555"
+    }
+}

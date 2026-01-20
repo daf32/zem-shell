@@ -9,7 +9,7 @@ class AliasCommand(BaseCommand):
     def execute(self, args: list[str], context, stdin=None, stdout=None):
         if not args:
             for name, value in sorted(context.aliases.items()):
-                stdout.write(f"alias {name}='{value}'\n")
+                self._write(f"alias {name}='{value}'\n", stdout)
             return
         for arg in args:
             if "=" in arg:
@@ -17,6 +17,6 @@ class AliasCommand(BaseCommand):
                 context.aliases[name.strip()] = value.strip("'\"")
             else:
                 if arg in context.aliases:
-                    stdout.write(f"alias {arg}='{context.aliases[arg]}'\n")
+                    self._write(f"alias {arg}='{context.aliases[arg]}'\n", stdout)
                 else:
-                    stdout.write(f"axonix: alias: {arg}: not found\n")
+                    self._write(f"axonix: alias: {arg}: not found\n", stdout)

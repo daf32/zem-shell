@@ -21,10 +21,11 @@ class AddCommand(BaseCommand):
         except ValueError:
             raise ArgumentError(self.name, args, reason="arguments must be numbers")
 
-        if stdin and not stdin.isatty():
+        # Try to read from stdin if available
+        stdin_content = self._read_stdin_all(stdin)
+        if stdin_content:
             try:
-                content = stdin.read()
-                for token in content.split():
+                for token in stdin_content.split():
                     numbers.append(float(token))
             except ValueError:
                 pass
@@ -37,7 +38,6 @@ class AddCommand(BaseCommand):
             )
 
         try:
-            if stdout:
-                stdout.write(str(sum(numbers)) + "\n")
+            self._write(str(sum(numbers)) + "\n", stdout)
         except ValueError:
             raise ArgumentError(self.name, args)

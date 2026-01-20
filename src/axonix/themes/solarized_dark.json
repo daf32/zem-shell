@@ -1,0 +1,26 @@
+{
+    "name": "Solarized",
+    "author": "Axonix Team",
+    "type": "dark",
+    "variants": [
+        "dark",
+        "light"
+    ],
+    "colors": {
+        "command": "#859900",
+        "variable": "#b58900",
+        "operator": "#2aa198",
+        "comment": "#586e75",
+        "string": "#2aa198",
+        "path": "#268bd2",
+        "prompt_symbol": "#839496",
+        "exit_code_ok": "#859900",
+        "exit_code_err": "#dc322f",
+        "error": "#dc322f",
+        "warning": "#cb4b16",
+        "info": "#268bd2",
+        "logo_primary": "#268bd2",
+        "logo_secondary": "#2aa198",
+        "logo_tertiary": "#586e75"
+    }
+}
