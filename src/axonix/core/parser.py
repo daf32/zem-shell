@@ -52,12 +52,46 @@ class Parser:
             expanded_in_chain.add(alias_name)
 
             alias_value = self.aliases[alias_name]
-            alias_tokens = self._tokenize(alias_value)
+            
+            # Check for parameters ($1, $2, etc.)
+            params = re.findall(r'\$(\d+)', alias_value)
+            
+            if params:
+                # Parameterized alias
+                indices = [int(p) for p in params]
+                max_index = max(indices) if indices else 0
+                
+                # Arguments available after the command name
+                available_args = current_tokens[1:]
+                
+                # Consume arguments needed by alias
+                consumed_args = []
+                for i in range(max_index):
+                    if i < len(available_args):
+                        consumed_args.append(available_args[i])
+                    else:
+                        consumed_args.append("") # Missing arg becomes empty
+                
+                remaining_args = available_args[max_index:]
+                
+                # Perform substitution in the raw string value
+                new_value = alias_value
+                for i in range(1, max_index + 1):
+                    val = consumed_args[i-1]
+                    # Simple replacement of $N
+                    # Note: this might replace inside strings if not careful, but alias definitions
+                    # are treated as raw text templates here.
+                    new_value = new_value.replace(f"${i}", val)
+                
+                alias_tokens = self._tokenize(new_value)
+                current_tokens = alias_tokens + remaining_args
+            else:
+                # Simple alias
+                alias_tokens = self._tokenize(alias_value)
+                current_tokens = alias_tokens + current_tokens[1:]
 
-            if not alias_tokens:
+            if not current_tokens:
                 break
-
-            current_tokens = alias_tokens + current_tokens[1:]
 
         return current_tokens
 
@@ -139,8 +173,10 @@ class Parser:
                         current, in_token = [], False
                 elif ch == self.config.operators.quote: 
                     state, in_token = self.SINGLE, True
+                    current.append(ch)
                 elif ch == self.config.operators.double_quote: 
                     state, in_token = self.DOUBLE, True
+                    current.append(ch)
                 elif ch == self.config.operators.variable:
                     name, next_i = self._get_var_name(text, i + 1)
                     current.append(str(self.variables.get(name, "")))
@@ -175,10 +211,14 @@ class Parser:
                     current.append(ch)
                     in_token = True
             elif state == self.SINGLE:
-                if ch == self.config.operators.quote: state = self.NORMAL
+                if ch == self.config.operators.quote: 
+                    state = self.NORMAL
+                    current.append(ch)
                 else: current.append(ch)
             elif state == self.DOUBLE:
-                if ch == self.config.operators.double_quote: state = self.NORMAL
+                if ch == self.config.operators.double_quote: 
+                    state = self.NORMAL
+                    current.append(ch)
                 elif ch == self.config.operators.variable:
                     name, next_i = self._get_var_name(text, i + 1)
                     current.append(str(self.variables.get(name, "")))
@@ -264,6 +304,119 @@ class Parser:
         segments.append(("".join(current), None))
         return segments
 
+    def _remove_quotes(self, text: str) -> str:
+        """Remove quotes from text."""
+        if not text: return text
+        
+        result = []
+        state = self.NORMAL
+        escaped = False
+        
+        for ch in text:
+            if escaped:
+                result.append(ch)
+                escaped = False
+                continue
+            
+            if ch == self.config.operators.escape and state != self.SINGLE:
+                escaped = True
+                continue
+            
+            if state == self.NORMAL:
+                if ch == self.config.operators.quote: state = self.SINGLE
+                elif ch == self.config.operators.double_quote: state = self.DOUBLE
+                else: result.append(ch)
+            elif state == self.SINGLE:
+                if ch == self.config.operators.quote: state = self.NORMAL
+                else: result.append(ch)
+            elif state == self.DOUBLE:
+                if ch == self.config.operators.double_quote: state = self.NORMAL
+                else: result.append(ch)
+                
+        return "".join(result)
+
+    def _expand_globs(self, tokens: list[str]) -> list[str]:
+        """Expand tokens containing globs if they match files."""
+        import glob
+        import os
+        
+        expanded_tokens = []
+        
+        for token in tokens:
+            # Check if token contains unquoted wildcards
+            # We need to scan the token similar to _tokenize or _remove_quotes
+            # but detecting if *?[ are unquoted
+            
+            has_glob = False
+            state = self.NORMAL
+            escaped = False
+            
+            # Simple heuristic first: if no globs chars, skip expensive parse
+            if not any(c in token for c in "*?[]"):
+                expanded_tokens.append(self._remove_quotes(token))
+                continue
+            
+            # Verify if wildcards are unquoted
+            for ch in token:
+                if escaped:
+                    escaped = False
+                    continue
+                if ch == self.config.operators.escape and state != self.SINGLE:
+                    escaped = True
+                    continue
+                
+                if state == self.NORMAL:
+                    if ch == self.config.operators.quote: state = self.SINGLE
+                    elif ch == self.config.operators.double_quote: state = self.DOUBLE
+                    elif ch in "*?[]":
+                        has_glob = True
+                        break
+                elif state == self.SINGLE:
+                    if ch == self.config.operators.quote: state = self.NORMAL
+                elif state == self.DOUBLE:
+                    if ch == self.config.operators.double_quote: state = self.NORMAL
+            
+            if has_glob:
+                # To prevent glob expanding quoted parts (like "foo*bar"), we unfortunately
+                # can't easily use glob.glob directly on the token if it has quotes.
+                # BUT, shells usually glob pattern matching against files.
+                # If we strip quotes, we might lose info.
+                # However, standard glob doesn't support "partial quoting".
+                # Simplified strategy: If it has unquoted glob chars, we treat the WHOLE token as a glob pattern
+                # BUT we need to remove quotes first? No.
+                # If I have *.py, I want to match files ending in .py
+                # If I have "foo"*.py, I want files starting with foo and ending in .py
+                
+                # Correct approach: Construct a pattern where quoted chars are escaped for glob?
+                # Python's glob doesn't support escaping well across platforms.
+                
+                # Let's take a "Safe" approach:
+                # 1. If complex mixed quoting exists, fallback to no-glob (or just strip quotes).
+                # 2. If simple unquoted glob, expand.
+                
+                # Actually, let's just strip quotes for the pattern, but escape special chars that WERE quoted?
+                # Too complex for now.
+                # Simple implementation: Strip quotes, then glob.
+                # Caveat: "foo*.py" becomes foo*.py and expands. user expected "foo*.py"? No, shells expand mixed quotes.
+                # The only case we shouldn't expand is if the * itself is quoted.
+                
+                # So, if we detected `has_glob` (meaning there's an UNQUOTED wildcard), we expand.
+                # But what strictly is the pattern?
+                # The pattern is the token with quotes removed.
+                pattern = self._remove_quotes(token)
+                matches = glob.glob(pattern)
+                
+                if matches:
+                    expanded_tokens.extend(sorted(matches))
+                else:
+                    # No matches: preserve literal token (with quotes removed? or kept?)
+                    # Bash keeps the pattern AS IS (with quotes removed eventually).
+                    expanded_tokens.append(pattern)
+            else:
+                expanded_tokens.append(self._remove_quotes(token))
+                
+        return expanded_tokens
+
     def parse(self) -> list[dict]:
         """
         Returns a list of logical units.
@@ -290,20 +443,42 @@ class Parser:
                 toks = self._tokenize(pipe_seg)
                 toks = self._expand_aliases(toks)
                 if toks:
-                    args, stdin, stdout, append, background = self._extract_redirections(toks)
-                    if not args:
+                    # Redirection extraction needs to handle quoted filename tokens?
+                    # The current extractor just checks for > etc. Since > is special, it's never inside a token from _tokenize if it was unquoted.
+                    # _tokenize splits them. Quoted > is inside a token.
+                    # So _extract_redirections works on quoted tokens.
+                    
+                    args_raw, stdin, stdout, append, background = self._extract_redirections(toks)
+                    
+                    if not args_raw:
                         raise ParseError("Missing command name")
+                    
+                    # Expand globs and remove quotes for ARGS
+                    # Command name is usually not globbed? Bash does if it matches.
+                    # Let's expand everything.
+                    
+                    final_args = self._expand_globs(args_raw)
+                    
+                    if not final_args:
+                         # Could happen if glob returns empty? (only if nullglob set, which we don't support yet)
+                         # Our glob returns original if no match.
+                         # But _expand_globs creates a new list.
+                         pass
+
+                    # Clean redirection filenames (remove quotes)
+                    if stdin: stdin = self._remove_quotes(stdin)
+                    if stdout: stdout = self._remove_quotes(stdout)
                     
                     # Background can only be on the last command in pipeline
                     is_last = len(commands) == len(pipeline_segments) - 1
                     
                     commands.append({
-                        "name": args[0],
-                        "args": args[1:],
+                        "name": final_args[0],
+                        "args": final_args[1:],
                         "stdin_file": stdin,
                         "stdout_file": stdout,
                         "append": append,
-                        "background": background and is_last  # Only last command can be background
+                        "background": background and is_last
                     })
             
             if commands:

@@ -29,7 +29,10 @@ class CommandRegistry:
             raise ValueError(f"Command class {command_class} has no name")
         
         if name in cls._command_classes:
-            raise ValueError(f"Command '{name}' is already registered")
+            # Allow overwriting (e.g. user plugin overrides builtin)
+            # Just print a debug message or warning if needed
+            # print(f"Warning: Overwriting command '{name}'")
+            pass
         
         cls._command_classes[name] = command_class
     

@@ -154,12 +154,36 @@ class Shell:
             'error': c.error,
         })
         
+        # Setup Key Bindings
+        from prompt_toolkit.key_binding import KeyBindings
+        kb = KeyBindings()
+        
+        @kb.add('c-r')
+        async def _(event):
+            from axonix.ui.search import FuzzyHistorySearch
+            
+            # Get history from session
+            history_items = []
+            if self.session.history:
+                history_items = list(self.session.history.get_strings())
+            
+            # Combine with in-memory context history (newest first for UI logic handling)
+            combined = history_items + self.context.history
+            
+            searcher = FuzzyHistorySearch(combined)
+            result = await searcher.run_async()
+            
+            if result:
+                event.current_buffer.text = result
+                event.current_buffer.cursor_position = len(result)
+
         self.session = PromptSession(
             history=history,
             lexer=AxonixLexer(self),
             completer=AxonixCompleter(self),
             style=self.style,
-            complete_while_typing=True
+            complete_while_typing=True,
+            key_bindings=kb
         )
 
     
