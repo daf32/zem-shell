@@ -40,10 +40,15 @@ def activate_venv(context):
         else:
             bin_path = venv_path / "bin"
 
+        # Update OS environment
         os.environ["VIRTUAL_ENV"] = str(venv_path)
         os.environ["PATH"] = str(bin_path) + os.pathsep + context.original_path
 
-        context.active_venv = venv_path
+        # Update Context variables (CRITICAL: otherwise shell.py will overwrite env with stale vars)
+        context.variables["VIRTUAL_ENV"] = str(venv_path)
+        context.variables["PATH"] = os.environ["PATH"]
+
+        context.active_venv = str(venv_path)
 
 def deactivate_venv(context):
     """Deactivate venv - changes take effect only within this shell instance."""
@@ -51,9 +56,14 @@ def deactivate_venv(context):
     if "VIRTUAL_ENV" in os.environ:
         del os.environ["VIRTUAL_ENV"]
     
+    # Also remove from context variables
+    if "VIRTUAL_ENV" in context.variables:
+        del context.variables["VIRTUAL_ENV"]
+    
     # Restore original PATH if it was saved
     if hasattr(context, 'original_path') and context.original_path:
         os.environ["PATH"] = context.original_path
+        context.variables["PATH"] = context.original_path
     
     context.active_venv = None
 

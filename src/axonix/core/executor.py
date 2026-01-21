@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 from contextlib import contextmanager
-from typing import Optional, Protocol, TextIO, Union
+from typing import Optional, Protocol, TextIO, Union, cast
 
 from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
@@ -61,11 +61,11 @@ class CommandExecutor:
             try:
                 with managed_fd(stdin_fd, "r") as stdin_file:
                     if stdin_file is not None:
-                        stdin_obj = stdin_file
+                        stdin_obj = cast(TextIO, stdin_file)
                     
                     with managed_fd(stdout_fd, "w") as stdout_file:
                         if stdout_file is not None:
-                            stdout_obj = stdout_file
+                            stdout_obj = cast(TextIO, stdout_file)
                         
                         try:
                             command.execute(args, self.context, stdin=stdin_obj, stdout=stdout_obj)

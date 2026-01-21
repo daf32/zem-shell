@@ -24,3 +24,7 @@ class CdCommand(BaseCommand):
             raise ArgumentError(self.name, [target], reason="permission denied")
         except Exception as e:
             raise ArgumentError(self.name, [target], reason=str(e))
+
+    def get_completer(self):
+        from axonix.ui.completers.defaults import DirectoryCompleter
+        return DirectoryCompleter()

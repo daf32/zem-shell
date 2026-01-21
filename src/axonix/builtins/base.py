@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional, TextIO
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext
+    from axonix.ui.completers.base import BaseArgCompleter
 
 
 class BaseCommand:
@@ -228,6 +229,33 @@ class BaseCommand:
             NotImplementedError: Must be implemented in subclasses
         """
         raise NotImplementedError(f"Command '{self.name}' does not implement execute()")
+    
+    def get_plugin_config(self, context: "ExecutionContext") -> dict:
+        """Get configuration for this command/plugin.
+        
+        Tries to fetch config from context.shell.config.plugins[self.name].
+        Returns empty dict if not configured.
+        """
+        if hasattr(context, '_shell') and context._shell:
+            plugins_config = getattr(context._shell.config, 'plugins', {})
+            return plugins_config.get(self.name, {})
+        return {}
+
+    def get_completer(self) -> Optional["BaseArgCompleter"]:
+        """Get the argument completer for this command.
+        
+        Returns:
+            A BaseArgCompleter instance or None if no custom completion is needed.
+        """
+        return None
+
+    def get_default_config(self) -> dict:
+        """Get default configuration for this command/plugin.
+        
+        Returns:
+            Dictionary with default configuration values.
+        """
+        return {}
     
     def __repr__(self) -> str:
         """String representation for debugging."""

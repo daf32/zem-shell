@@ -190,3 +190,9 @@ class ThemeCommand(BaseCommand):
         else:
             self._write(f"Unknown subcommand: {subcommand}\n", stdout)
             self._write(f"Usage: {self.usage}\n", stdout)
+
+    def get_completer(self):
+        """Return the ThemeCompleter."""
+        from axonix.ui.completers.theme import ThemeCompleter
+        from axonix.config.settings import config
+        return ThemeCompleter(config)

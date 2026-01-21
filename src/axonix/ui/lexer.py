@@ -95,7 +95,19 @@ class AxonixLexer(Lexer):
                         i += 1
                     
                     if is_first_word:
-                        tokens.append(("class:command", word))
+                        style_class = "class:command"
+                        
+                        # Validate command
+                        is_builtin = word in self.shell.commands
+                        is_alias = word in self.shell.context.aliases
+                        
+                        if not (is_builtin or is_alias):
+                            # Check system commands (expensive, but cached)
+                            if word not in self.system_commands:
+                                # Not found -> Error color
+                                style_class = "class:error"
+                            
+                        tokens.append((style_class, word))
                         is_first_word = False
                     else:
                         tokens.append(("", word))

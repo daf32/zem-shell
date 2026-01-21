@@ -88,6 +88,7 @@ class ThemeManager:
             'exit_code_err': c.exit_code_err,
             'git_branch': c.info,
             'venv': c.info,
+            'error': c.error,
         })
         
         # Update session style

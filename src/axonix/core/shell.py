@@ -61,7 +61,49 @@ class Shell:
 
         if self.config.venv.auto:
             activate_venv(self.context)
+            
+        self._sync_plugin_configs()
 
+    def _sync_plugin_configs(self):
+        """Sync default plugin configurations to the config file."""
+        from axonix.config.settings import CONFIG_PATH
+        import json
+        
+        updated = False
+        plugins_config = self.config.plugins.copy()
+        
+        for name, cmd in self.commands.items():
+            defaults = cmd.get_default_config()
+            if defaults and name not in plugins_config:
+                plugins_config[name] = defaults
+                updated = True
+        
+        if updated:
+            try:
+                # We update the file directly to persist changes
+                if os.path.exists(CONFIG_PATH):
+                    with open(CONFIG_PATH, 'r') as f:
+                        data = json.load(f)
+                else:
+                    data = {}
+                
+                # Ensure plugins section exists
+                if "plugins" not in data:
+                    data["plugins"] = {}
+                
+                # Update with new defaults (only if not present)
+                for k, v in plugins_config.items():
+                    if k not in data["plugins"]:
+                        data["plugins"][k] = v
+                
+                with open(CONFIG_PATH, 'w') as f:
+                    json.dump(data, f, indent=4)
+                
+                # Update in-memory config
+                self.config.plugins = plugins_config
+                
+            except Exception as e:
+                print(f"Warning: Failed to sync plugin configs: {e}")
 
     def _create_default_rc(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -109,6 +151,7 @@ class Shell:
             'exit_code_err': c.exit_code_err,
             'git_branch': c.info,  # Use info color for git branch
             'venv': c.info,  # Use info color for venv
+            'error': c.error,
         })
         
         self.session = PromptSession(

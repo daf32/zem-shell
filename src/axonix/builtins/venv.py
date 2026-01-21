@@ -35,7 +35,7 @@ class VenvCommand(BaseCommand):
                 deactivate_venv(context)
                 self._write("✓ Deactivated venv\n", stdout)
             else:
-                self._write("✗ No venv is currently unactive\n", stdout)
+                self._write("✗ No venv is currently active\n", stdout)
         
         elif subcommand == "on":
             pass

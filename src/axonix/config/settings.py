@@ -1,4 +1,5 @@
 import os
+from typing import Any, Dict
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -83,6 +84,7 @@ class AppConfig(BaseSettings):
     colors: ColorScheme = Field(default_factory=ColorScheme)
     active_theme: str = "default"
     venv: VenvScheme = Field(default_factory=VenvScheme)
+    plugins: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("operators")
     @classmethod
