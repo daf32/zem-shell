@@ -16,6 +16,8 @@ import signal
 import sys
 import threading
 import subprocess
+import time
+from datetime import datetime
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
@@ -51,6 +53,7 @@ class Shell:
         self.executor = CommandExecutor(self.context)
         
         self.context._shell = self
+        self._last_command_duration: Optional[float] = None  # Duration in seconds
         self._setup_prompt_session()
         self._setup_signal_handlers()
         
@@ -133,26 +136,48 @@ class Shell:
             except Exception as e:
                 print(f"Error loading {self.rc_file}: {e}")
 
+    def _build_style(self) -> Style:
+        """Build prompt_toolkit style from config colors."""
+        c = self.config.colors
+        return Style.from_dict({
+            # Commands and syntax
+            'command': f'bold {c.command}',
+            'variable': c.variable,
+            'operator': c.operator,
+            'comment': f'italic {c.comment}',
+            'string': c.string,
+            
+            # Paths and files
+            'path': c.path,
+            'path-notfound': f'underline {c.error}',  # Non-existent paths
+            
+            # Arguments
+            'flag': c.operator,  # Command flags like -v, --help
+            'number': c.variable,  # Numeric values
+            'url': f'underline {c.info}',  # URLs
+            
+            # Prompt elements
+            'prompt_symbol': f'bold {c.prompt_symbol}',
+            'exit_code_ok': c.exit_code_ok,
+            'exit_code_err': c.exit_code_err,
+            'git_branch': c.info,
+            'venv': c.info,
+            
+            # Status
+            'error': c.error,
+            'warning': c.warning,
+            
+            # Right prompt
+            'rprompt': c.comment,
+            'duration': c.warning,
+        })
+
     def _setup_prompt_session(self):
         """Setup prompt_toolkit session with history, lexer and completer."""
         history = FileHistory(self.history_file) if self.config.history.enable else None
         
         # Build style from config colors
-        c = self.config.colors
-        self.style = Style.from_dict({
-            'command': f'bold {c.command}',
-            'variable': c.variable,
-            'operator': c.operator,
-            'comment': c.comment,
-            'string': c.string,
-            'path': c.path,
-            'prompt_symbol': f'bold {c.prompt_symbol}',
-            'exit_code_ok': c.exit_code_ok,
-            'exit_code_err': c.exit_code_err,
-            'git_branch': c.info,  # Use info color for git branch
-            'venv': c.info,  # Use info color for venv
-            'error': c.error,
-        })
+        self.style = self._build_style()
         
         # Setup Key Bindings
         from prompt_toolkit.key_binding import KeyBindings
@@ -260,6 +285,39 @@ class Shell:
         prompt_text += f"{venv_info}{path_display}{git_info} {self.config.input.prompt} "
         return prompt_text
 
+    def _format_duration(self, seconds: float) -> str:
+        """Format duration for display."""
+        if seconds < 0.001:
+            return ""  # Don't show for very fast commands
+        elif seconds < 1:
+            return f"{int(seconds * 1000)}ms"
+        elif seconds < 60:
+            return f"{seconds:.1f}s"
+        elif seconds < 3600:
+            mins = int(seconds // 60)
+            secs = int(seconds % 60)
+            return f"{mins}m{secs}s"
+        else:
+            hours = int(seconds // 3600)
+            mins = int((seconds % 3600) // 60)
+            return f"{hours}h{mins}m"
+
+    def _get_rprompt(self) -> list:
+        """Build right prompt with time and command duration."""
+        parts = []
+        
+        # Show command duration if significant
+        if self._last_command_duration is not None and self._last_command_duration >= 0.1:
+            duration_str = self._format_duration(self._last_command_duration)
+            if duration_str:
+                parts.append(('class:duration', f"⏱ {duration_str} "))
+        
+        # Show current time
+        current_time = datetime.now().strftime("%H:%M:%S")
+        parts.append(('class:rprompt', current_time))
+        
+        return parts
+
     def _get_input(self):
         real_cwd = os.getcwd()
         display_path = self._format_path(real_cwd)
@@ -279,7 +337,10 @@ class Shell:
         else:
             prompt_html = self._build_text_prompt(venv_display, display_path, git_display, exit_code)
 
-        return self.session.prompt(prompt_html)
+        # Build right prompt
+        rprompt = self._get_rprompt()
+
+        return self.session.prompt(prompt_html, rprompt=rprompt)
 
     def _print_error(self, message: str):
         from prompt_toolkit import print_formatted_text, HTML
@@ -550,7 +611,13 @@ class Shell:
                     self._close_shell()
                     return
 
+                # Measure command execution time (after user input is received)
+                start_time = time.perf_counter()
                 self._execute_line(user_input)
+                end_time = time.perf_counter()
+
+                self._last_command_duration = end_time - start_time
 
             except Exception as e:
                 print(f"Internal error: {e}")
+                self._last_command_duration = None

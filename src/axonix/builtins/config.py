@@ -7,7 +7,19 @@ from axonix.ui.completers.base import BaseArgCompleter
 from prompt_toolkit.completion import Completion
 from prompt_toolkit.document import Document
 
+
 class ConfigCompleter(BaseArgCompleter):
+    """Completer for config command with subcommand and key completion."""
+    
+    SUBCOMMANDS = {
+        "list": "List all configuration values",
+        "get": "Get a configuration value",
+        "set": "Set a configuration value",
+        "reload": "Reload configuration from file",
+        "path": "Show configuration file path",
+        "edit": "Open configuration in editor",
+    }
+    
     def __init__(self, config_data: dict):
         self.config_data = config_data
 
@@ -22,57 +34,66 @@ class ConfigCompleter(BaseArgCompleter):
         return keys
 
     def get_completions(self, document: Document, parts: List[str], word_before: str):
-        # parts example: ['config', 'set', 'key']
+        ends_with_space = document.text_before_cursor.endswith(" ")
         
-        # 1. Subcommands completion (list, get, set)
-        # parts: ['config', ''] -> len 2
-        if len(parts) == 2:
+        # Subcommands completion
+        if len(parts) == 1 and ends_with_space:
+            for cmd, desc in sorted(self.SUBCOMMANDS.items()):
+                yield Completion(cmd, start_position=0, display_meta=desc)
+            return
+        
+        if len(parts) == 2 and not ends_with_space:
             current_subcmd = parts[1]
-            for cmd in ["list", "get", "set"]:
+            for cmd, desc in sorted(self.SUBCOMMANDS.items()):
                 if cmd.startswith(current_subcmd):
-                    yield Completion(cmd, start_position=-len(current_subcmd))
+                    yield Completion(cmd, start_position=-len(current_subcmd), display_meta=desc)
             return
 
-        # 2. Key completion
-        # parts: ['config', 'set', 'key_prefix'] -> len 3
-        if len(parts) >= 3:
+        # Key completion for get/set
+        if len(parts) >= 2:
             subcmd = parts[1]
             if subcmd in ["get", "set"]:
-                # Only complete key if it's the 3rd argument (index 2)
-                # For 'set', we have a value at index 3, we usually don't complete values unless enum.
-                if len(parts) == 3:
-                     # Suggest keys
+                if (len(parts) == 2 and ends_with_space) or (len(parts) == 3 and not ends_with_space):
                     all_keys = self._get_keys(self.config_data)
-                    current_input = parts[2]
+                    current_input = parts[2] if len(parts) == 3 else ""
                     
-                    for key in all_keys:
+                    for key in sorted(all_keys):
                         if key.lower().startswith(current_input.lower()):
                             yield Completion(key, start_position=-len(current_input))
+
 
 class ConfigCommand(BaseCommand):
     name = "config"
     help = "Manage shell configuration"
-    usage = "config [list|get <key>|set <key> <value>]"
+    usage = "config [list|get|set|reload|path|edit] [key] [value]"
     tags = ["builtin", "core"]
+    examples = [
+        "config list                    - Show all settings",
+        "config get input.prompt        - Get prompt symbol",
+        "config set input.prompt '>'    - Change prompt symbol",
+        "config reload                  - Reload config from file",
+        "config path                    - Show config file location",
+        "config edit                    - Open config in $EDITOR",
+    ]
 
     def get_completer(self):
-        # We need to load fresh config data for completion
         from axonix.config.settings import CONFIG_PATH
         try:
             with open(CONFIG_PATH, "r") as f:
                 data = json.load(f)
             return ConfigCompleter(data)
-        except:
-            return None
+        except Exception:
+            return ConfigCompleter({})
 
     def execute(self, args: list[str], context: ExecutionContext, stdin=None, stdout=None):
+        from axonix.config.settings import CONFIG_PATH, AppConfig
+        
         if not args:
             self._write(f"Usage: {self.usage}\n", stdout)
+            self._write("Subcommands: list, get, set, reload, path, edit\n", stdout)
             return
 
-        command = args[0]
-        
-        from axonix.config.settings import CONFIG_PATH
+        command = args[0].lower()
         
         # Load current raw JSON
         if os.path.exists(CONFIG_PATH):
@@ -94,42 +115,116 @@ class ConfigCommand(BaseCommand):
                 self._write(f"{val}\n", stdout)
             else:
                 self._write(f"Key '{key}' not found.\n", stdout)
+                context.last_exit_code = 1
                 
         elif command == "set":
             if len(args) < 3:
                 self._write("Usage: config set <key> <value>\n", stdout)
                 return
             key = args[1]
-            value_str = " ".join(args[2:]) # Allow values with spaces? Or strict?
-            # Better to take just one arg usually, but CLI args are split by space.
-            # Let's join the rest as value strings usually don't need executing.
+            value_str = " ".join(args[2:])
             
-            # Type inference
             value = self._infer_type(value_str)
             
             if self._set_value(data, key, value):
-                # Save to disk
                 with open(CONFIG_PATH, "w") as f:
                     json.dump(data, f, indent=4)
                 
-                self._write(f"✅ Set '{key}' to '{value}'\n", stdout)
+                self._write(f"✓ Set '{key}' = {repr(value)}\n", stdout)
                 
-                # Attempt Hot Reload (Partial)
-                # We can update context._shell.config directly?
-                # It's a Pydantic model. We can try to reload attributes.
-                if hasattr(context, '_shell'):
-                    # Simplest way: re-instantiate AppConfig if possible or patch dict
-                    # Since Pydantic models are mostly immutable or validated...
-                    # Let's just warn for restart for now, or patch the specific value if we can reach it.
-                    self._write("ℹ️  Changes saved. Some settings may require a shell restart.\n", stdout)
-                    
-                    # Update active theme if colors changed?
-                    if key.startswith("colors."):
-                        from axonix.utils.themes import ThemeManager
-                        ThemeManager.apply_theme(context._shell, context._shell.config.active_theme)
-
+                # Hot reload the setting if possible
+                self._hot_reload_setting(context, key, value, stdout)
             else:
-                self._write(f"❌ Failed to set '{key}'. Check if parent keys exist.\n", stdout)
+                self._write(f"✗ Failed to set '{key}'\n", stdout)
+                context.last_exit_code = 1
+        
+        elif command == "reload":
+            self._reload_config(context, stdout)
+        
+        elif command == "path":
+            self._write(f"{CONFIG_PATH}\n", stdout)
+        
+        elif command == "edit":
+            editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "nano"))
+            self._write(f"Opening {CONFIG_PATH} with {editor}...\n", stdout)
+            os.system(f'{editor} "{CONFIG_PATH}"')
+            # Reload after editing
+            self._write("Reloading configuration...\n", stdout)
+            self._reload_config(context, stdout)
+        
+        else:
+            self._write(f"Unknown subcommand: {command}\n", stdout)
+            self._write(f"Usage: {self.usage}\n", stdout)
+            context.last_exit_code = 1
+
+    def _reload_config(self, context: ExecutionContext, stdout):
+        """Reload configuration from file and apply changes."""
+        from axonix.config.settings import AppConfig
+        
+        if not hasattr(context, '_shell') or context._shell is None:
+            self._write("✗ Cannot reload: shell reference not found\n", stdout)
+            return
+        
+        shell = context._shell
+        
+        try:
+            # Create new config instance (reads from file)
+            new_config = AppConfig()
+            
+            # Update shell config
+            shell.config = new_config
+            
+            # Rebuild style
+            shell.style = shell._build_style()
+            if hasattr(shell, 'session') and shell.session:
+                shell.session.style = shell.style
+            
+            # Invalidate caches
+            if hasattr(shell.session, 'lexer') and shell.session.lexer:
+                lexer = shell.session.lexer
+                if hasattr(lexer, 'invalidate_cache'):
+                    lexer.invalidate_cache()
+            
+            if hasattr(shell.session, 'completer') and shell.session.completer:
+                completer = shell.session.completer
+                if hasattr(completer, 'invalidate_cache'):
+                    completer.invalidate_cache()
+            
+            self._write("✓ Configuration reloaded successfully\n", stdout)
+            
+        except Exception as e:
+            self._write(f"✗ Failed to reload config: {e}\n", stdout)
+            context.last_exit_code = 1
+
+    def _hot_reload_setting(self, context: ExecutionContext, key: str, value: Any, stdout):
+        """Try to hot-reload a specific setting."""
+        if not hasattr(context, '_shell') or context._shell is None:
+            return
+        
+        shell = context._shell
+        parts = key.split('.')
+        
+        # Handle color changes
+        if parts[0] == "colors" and len(parts) == 2:
+            color_name = parts[1]
+            if hasattr(shell.config.colors, color_name):
+                setattr(shell.config.colors, color_name, value)
+                shell.style = shell._build_style()
+                if hasattr(shell, 'session') and shell.session:
+                    shell.session.style = shell.style
+                self._write("  (style updated)\n", stdout)
+                return
+        
+        # Handle input settings
+        if parts[0] == "input" and len(parts) == 2:
+            setting_name = parts[1]
+            if hasattr(shell.config.input, setting_name):
+                setattr(shell.config.input, setting_name, value)
+                self._write("  (setting applied)\n", stdout)
+                return
+        
+        # Default: suggest reload
+        self._write("  (use 'config reload' to apply)\n", stdout)
 
     def _print_dict(self, d: dict, prefix: str = "", stdout=None):
         for k, v in d.items():

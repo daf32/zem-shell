@@ -1,16 +1,24 @@
 from axonix.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
+import sys
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext
 
 
 class HistoryCommand(BaseCommand):
-    help = "Show history"
-    usage = "history [-c]"
+    help = "Show command history"
+    usage = "history [-c|--clear] [limit] [search_term]"
     tags = ["builtin"]
+    examples = [
+        "history          - Show all history",
+        "history 10       - Show last 10 commands",
+        "history git      - Show commands containing 'git'",
+        "history -c       - Clear history",
+    ]
 
     def clear(self, context: "ExecutionContext"):
+        """Clear command history."""
         context.history = []
 
     def execute(
@@ -28,6 +36,9 @@ class HistoryCommand(BaseCommand):
         for arg in args:
             if arg.isdigit():
                 limit = int(arg)
+            elif arg.startswith("-"):
+                # Skip unknown flags
+                continue
             else:
                 search_term = arg
 
@@ -35,11 +46,10 @@ class HistoryCommand(BaseCommand):
         
         # Filter by search term
         if search_term:
-            filtered_history = []
-            for i, cmd in enumerate(history):
-                if search_term in cmd:
-                    filtered_history.append((i + 1, cmd))
-            entries = filtered_history
+            entries = [
+                (i + 1, cmd) for i, cmd in enumerate(history)
+                if search_term.lower() in cmd.lower()
+            ]
         else:
             entries = [(i + 1, cmd) for i, cmd in enumerate(history)]
 
@@ -47,20 +57,33 @@ class HistoryCommand(BaseCommand):
         if limit and limit < len(entries):
             entries = entries[-limit:]
 
-        # Use colors for formatting if available
-        path_color = context._shell.config.colors.path if hasattr(context, "_shell") else "#00ffff"
-        cmd_color = context._shell.config.colors.command if hasattr(context, "_shell") else "#ffffff"
-        
-        from prompt_toolkit import print_formatted_text
-        from prompt_toolkit.formatted_text import FormattedText
-        
-        for idx, cmd in entries:
-            # We use print_formatted_text for colored output if stdout is terminal-like
-            # Otherwise fall back to plain _write
-            if hasattr(stdout, "isatty") and stdout.isatty():
-                print_formatted_text(FormattedText([
-                    (path_color, f"{idx:3}  "),
-                    (cmd_color, cmd)
-                ]), file=stdout)
+        if not entries:
+            if search_term:
+                self._write(f"No history entries matching '{search_term}'\n", stdout)
             else:
-                self._write(f"{idx:3}  {cmd}\n", stdout)
+                self._write("No history entries\n", stdout)
+            return
+
+        # Get colors for formatting if available
+        path_color = "#00ffff"
+        cmd_color = "#ffffff"
+        if hasattr(context, "_shell") and context._shell:
+            path_color = context._shell.config.colors.path
+            cmd_color = context._shell.config.colors.command
+        
+        # Check if we can use colored output (stdout is a real terminal)
+        use_colors = stdout is None or (hasattr(stdout, "isatty") and stdout.isatty())
+        
+        if use_colors:
+            from prompt_toolkit import print_formatted_text
+            from prompt_toolkit.formatted_text import FormattedText
+            
+            for idx, cmd in entries:
+                print_formatted_text(FormattedText([
+                    (path_color, f"{idx:5}  "),
+                    (cmd_color, cmd)
+                ]))
+        else:
+            # Plain text output for pipes/redirects
+            for idx, cmd in entries:
+                self._write(f"{idx:5}  {cmd}\n", stdout)

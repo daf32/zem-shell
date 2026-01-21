@@ -44,20 +44,41 @@ class ThemeCommand(BaseCommand):
         subcommand = args[0].lower()
     
         if subcommand == "list":
-            themes = manager.list_themes()
+            # Include invalid themes to show errors
+            themes = manager.list_themes(include_invalid=True)
+            validation_errors = manager.get_validation_errors()
+            
             self._write("\nAvailable themes:\n\n", stdout)
             for name, info in sorted(themes.items()):
                 data = info["data"]
+                is_valid = info.get("valid", True)
                 theme_type = data.get("type", "dark")
                 author = data.get("author", "Unknown")
                 display_name = data.get("name", name)
                 
-                # Color the theme name
-                color = config.colors.info
-                print_formatted_text(FormattedText([
-                    (color, f"  {display_name}"),
-                    ("", f" ({theme_type}) - by {author}")
-                ]))
+                if is_valid:
+                    color = config.colors.info
+                    print_formatted_text(FormattedText([
+                        (color, f"  {display_name}"),
+                        ("", f" ({theme_type}) - by {author}")
+                    ]))
+                else:
+                    # Show invalid themes with warning
+                    print_formatted_text(FormattedText([
+                        (config.colors.warning, f"  {display_name}"),
+                        (config.colors.error, " ⚠ invalid"),
+                        ("", f" ({theme_type}) - by {author}")
+                    ]))
+            
+            # Show validation errors if any
+            if validation_errors:
+                self._write("\n⚠ Theme validation issues:\n", stdout)
+                for theme_name, errors in validation_errors.items():
+                    print_formatted_text(FormattedText([
+                        (config.colors.warning, f"  {theme_name}: "),
+                        (config.colors.error, "; ".join(errors))
+                    ]))
+            
             self._write("\n", stdout)
         
         elif subcommand == "set":
@@ -194,5 +215,5 @@ class ThemeCommand(BaseCommand):
     def get_completer(self):
         """Return the ThemeCompleter."""
         from axonix.ui.completers.theme import ThemeCompleter
-        from axonix.config.settings import config
-        return ThemeCompleter(config)
+        from axonix.config.settings import AppConfig
+        return ThemeCompleter(AppConfig())
