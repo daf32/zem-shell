@@ -137,7 +137,16 @@ class AppConfig(BaseSettings):
 
 def _ensure_config_file(path: str) -> None:
     """Make sure ``path`` exists, migrating from the legacy project-root
-    location when possible, otherwise creating a default config."""
+    location when possible, otherwise creating a default config.
+
+    Side-effect on import is intentional: it ensures
+    ``JsonConfigSettingsSource`` has something to read on first run. We
+    deliberately do NOT instantiate a module-level ``config = AppConfig()``
+    afterwards — any module that wants the live config should construct
+    ``AppConfig()`` itself (cheap, just re-reads the JSON), so a malformed
+    config raises ``ValidationError`` from inside ``main()`` where it is
+    properly handled, rather than at import time.
+    """
     if os.path.exists(path):
         return
 
@@ -156,14 +165,11 @@ def _ensure_config_file(path: str) -> None:
             pass
 
     import json
-    _default_config = AppConfig()
     try:
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(_default_config.model_dump(), f, indent=4)
+            json.dump(AppConfig().model_dump(), f, indent=4)
     except OSError:
         pass
 
 
 _ensure_config_file(CONFIG_PATH)
-
-config = AppConfig()
