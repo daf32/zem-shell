@@ -1,5 +1,7 @@
 """Command executor with proper resource management."""
+import logging
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -10,8 +12,6 @@ from typing import Optional, Protocol, TextIO, Union, cast
 from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
 from axonix.errors.base_error import CLIError
-from axonix.utils.logger import get_logger
-import signal
 
 
 class ProcessResult(Protocol):
@@ -44,7 +44,7 @@ class CommandExecutor:
     def __init__(self, context: ExecutionContext):
         self.context = context
         self._active_processes: list[Union[subprocess.Popen, threading.Thread]] = []
-        self.logger = get_logger()
+        self.logger = logging.getLogger("axonix.executor")
 
     def _get_fresh_path(self) -> str:
         """Get fresh PATH from the parent shell."""
