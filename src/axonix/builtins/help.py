@@ -104,8 +104,7 @@ class HelpCommand(BaseCommand):
                 return
             
             self._write(f"help: command '{cmd_name}' not found\n", stdout)
-            context.last_exit_code = 1
-            return
+            return 1
 
         # Detailed command info
         self._write(f"\nCommand: {cmd.name}\n", stdout)

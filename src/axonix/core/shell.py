@@ -564,7 +564,11 @@ class Shell:
                 if isinstance(p, threading.Thread):
                     p.join()
                     if is_last:
-                        exit_code = self.context.last_exit_code
+                        # The builtin worker thread stashes its exit code on
+                        # the Thread object (see CommandExecutor.execute_builtin).
+                        # Reading after join() is safe — the worker is done.
+                        exit_code = getattr(p, "exit_code", 0)
+                        self.context.last_exit_code = exit_code
                 else:
                     exit_code = p.wait()
 

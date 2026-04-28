@@ -53,45 +53,60 @@ class CommandExecutor:
         stdin_fd: Optional[int] = None,
         stdout_fd: Optional[int] = None,
     ) -> threading.Thread:
-        """Execute a builtin command in a thread with proper resource management."""
-        
+        """Execute a builtin in a worker thread.
+
+        The builtin's exit code is stashed on the returned ``Thread`` as a
+        ``.exit_code`` attribute; the caller (``Shell._execute_pipeline``)
+        reads it after ``join()`` and writes it to ``context.last_exit_code``
+        from the main thread. This keeps the shared exit-code slot free of
+        cross-thread races when multiple builtins run in the same pipeline.
+        """
+
         def run_command():
             stdin_obj: Optional[TextIO] = sys.stdin
             stdout_obj: Optional[TextIO] = sys.stdout
-            
+
+            exit_code = 0
             try:
                 with managed_fd(stdin_fd, "r") as stdin_file:
                     if stdin_file is not None:
                         stdin_obj = cast(TextIO, stdin_file)
-                    
+
                     with managed_fd(stdout_fd, "w") as stdout_file:
                         if stdout_file is not None:
                             stdout_obj = cast(TextIO, stdout_file)
-                        
+
                         try:
-                            command.execute(args, self.context, stdin=stdin_obj, stdout=stdout_obj)
+                            ret = command.execute(
+                                args, self.context, stdin=stdin_obj, stdout=stdout_obj
+                            )
+                            # Backward compat: legacy builtins return None.
+                            exit_code = int(ret) if ret is not None else 0
                         except BrokenPipeError:
                             # Broken pipe is expected in pipelines when consumer stops reading
-                            pass
+                            exit_code = 0
                         except CLIError as e:
-                            # CLIErrors are user-facing and should be printed
-                            self.context.last_exit_code = getattr(e, "exit_code", 1)
+                            exit_code = getattr(e, "exit_code", 1)
                             if stdout_obj:
                                 stdout_obj.write(f"{e}\n")
                             else:
                                 sys.stderr.write(f"{e}\n")
                         except Exception as e:
-                            self.context.last_exit_code = 1
+                            exit_code = 1
                             self.logger.error(f"Error in {command.name}: {e}")
                             sys.stderr.write(f"Error in {command.name}: {e}\n")
             except OSError as e:
-                self.context.last_exit_code = 1
+                exit_code = 1
                 self.logger.error(f"IO error in {command.name}: {e}")
                 sys.stderr.write(f"IO error in {command.name}: {e}\n")
-        
-        # Use daemon=True so threads don't prevent shell shutdown
-        # Threads are explicitly joined in _execute_pipeline, so this is safe
+            finally:
+                # Stash on the thread object — read by the main thread post-join.
+                thread.exit_code = exit_code  # type: ignore[attr-defined]
+
+        # Use daemon=True so threads don't prevent shell shutdown.
+        # Threads are explicitly joined in _execute_pipeline, so this is safe.
         thread = threading.Thread(target=run_command, daemon=True)
+        thread.exit_code = 0  # type: ignore[attr-defined]
         self._active_processes.append(thread)
         thread.start()
         return thread
