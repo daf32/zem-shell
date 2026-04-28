@@ -1,8 +1,29 @@
+import logging
+import os
 import sys
 from pydantic import ValidationError
 
 
+def _configure_logging():
+    """Wire `axonix.*` loggers up to stderr when AXONIX_LOG_ENABLED=true.
+
+    Levels come from AXONIX_LOG_LEVEL (DEBUG/INFO/WARNING/ERROR), default
+    WARNING. When disabled, the NullHandler installed in ``axonix/__init__``
+    swallows everything.
+    """
+    if os.getenv("AXONIX_LOG_ENABLED", "").lower() != "true":
+        return
+    level_name = os.getenv("AXONIX_LOG_LEVEL", "WARNING").upper()
+    level = getattr(logging, level_name, logging.WARNING)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("[%(levelname)s] %(name)s: %(message)s"))
+    pkg_logger = logging.getLogger("axonix")
+    pkg_logger.addHandler(handler)
+    pkg_logger.setLevel(level)
+
+
 def main():
+    _configure_logging()
     try:
         from axonix.core.shell import Shell
         shell = Shell()
