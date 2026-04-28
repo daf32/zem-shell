@@ -556,30 +556,38 @@ class Shell:
                 safe_close(prev_pipe_read)
 
     def run(self):
-        while self.context.running:
-            try:
+        try:
+            while self.context.running:
                 try:
-                    user_input = self._get_input()
-                    
-                    if self._interrupted:
+                    try:
+                        user_input = self._get_input()
+
+                        if self._interrupted:
+                            self._interrupted = False
+                            continue
+
+                    except KeyboardInterrupt:
                         self._interrupted = False
                         continue
 
-                except KeyboardInterrupt:
-                    self._interrupted = False
-                    continue
+                    except EOFError:
+                        return
 
-                except EOFError:
-                    return
+                    # Measure command execution time
+                    start_time = time.perf_counter()
+                    self._execute_line(user_input)
+                    end_time = time.perf_counter()
 
-                # Measure command execution time
-                start_time = time.perf_counter()
-                self._execute_line(user_input)
-                end_time = time.perf_counter()
+                    self._last_command_duration = end_time - start_time
 
-                self._last_command_duration = end_time - start_time
-
-            except Exception as e:
-                print(f"Internal error: {e}")
-                self._last_command_duration = None
+                except Exception as e:
+                    print(f"Internal error: {e}")
+                    self._last_command_duration = None
+        finally:
+            # Always restore termios attrs / clean up child processes,
+            # whether we exit via Ctrl-D, `exit`, an unhandled exception,
+            # or normal `running = False`. Previously this only ran on
+            # SIGTERM, leaving the user's terminal in a half-broken state
+            # after Ctrl-D (no echo of typed control chars).
+            self._close_shell()
 
