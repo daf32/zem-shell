@@ -10,7 +10,7 @@ class LogoCommand(BaseCommand):
     usage = "logo [--version]"
     tags = ["builtin", "ui"]
 
-    VERSION = "0.1.0"
+    VERSION = "1.0.0"
 
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None

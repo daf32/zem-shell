@@ -23,6 +23,7 @@ class OperatorsConfig(BaseModel):
 
 class InputSettings(BaseModel):
     prompt: str = "#"
+    rprompt: bool = True
     show_full_path: bool = False
     path_depth: int = Field(default=1, ge=0)
     show_git_info: bool = True

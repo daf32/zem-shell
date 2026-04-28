@@ -37,6 +37,23 @@ class ExecutionContext(BaseModel):
     def sync_from_environment(self):
         """Sync os.environ to variables."""
         self.variables.update(os.environ)
+        # Also update PATH with fresh value if available
+        try:
+            import subprocess
+            shell = self.variables.get('SHELL', '/bin/bash')
+            result = subprocess.run(
+                [shell, '-c', 'echo $PATH'],
+                capture_output=True,
+                text=True,
+                timeout=1
+            )
+            if result.returncode == 0:
+                fresh_path = result.stdout.strip()
+                if fresh_path:
+                    self.variables['PATH'] = fresh_path
+                    os.environ['PATH'] = fresh_path
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
+            pass
     
     @property
     def last_exit_code(self) -> int:

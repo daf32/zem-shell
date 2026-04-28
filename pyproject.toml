@@ -1,9 +1,12 @@
 [project]
 name = "axonix"
-version = "0.1.0"
+version = "0.9.9-alpha"
 description = "A modular Python-based shell focused on extensibility and speed"
 readme = "README.md"
 requires-python = ">=3.13"
+authors = [
+  { name = "Anton Litvinov" }
+]
 dependencies = [
     "prompt-toolkit>=3.0.52",
     "pydantic-settings>=2.12.0",

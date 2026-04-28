@@ -3,6 +3,9 @@ set -e
 
 echo "🚀 Installing Axonix CLI..."
 
+# Get the project root (parent directory of scripts/)
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
 # Ensure uv is installed
 if ! command -v uv &> /dev/null; then
     echo "❌ Error: 'uv' is not installed."
@@ -10,7 +13,7 @@ if ! command -v uv &> /dev/null; then
 fi
 
 echo "📦 Installing 'ax' command globally using uv tool..."
-uv tool install . --force --reinstall
+uv tool install "$PROJECT_ROOT" --force --reinstall
 
 echo ""
 echo "✅ Success!"

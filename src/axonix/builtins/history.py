@@ -1,6 +1,5 @@
 from axonix.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
-import sys
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext

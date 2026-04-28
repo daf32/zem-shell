@@ -15,9 +15,9 @@ import os
 import signal
 import sys
 import threading
-import subprocess
 import time
 from datetime import datetime
+import termios
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
@@ -56,6 +56,7 @@ class Shell:
         self._last_command_duration: Optional[float] = None  # Duration in seconds
         self._setup_prompt_session()
         self._setup_signal_handlers()
+        self._interrupted = False
         
         if self.config.rc.auto_create and not os.path.exists(self.rc_file):
             self._create_default_rc()
@@ -66,6 +67,15 @@ class Shell:
             activate_venv(self.context)
             
         self._sync_plugin_configs()
+
+        self._shell_pgid = os.getpgrp()
+        self._tty_fd = sys.stdin.fileno()
+
+        self._orig_term_attrs = termios.tcgetattr(self._tty_fd)
+
+        new_attrs = termios.tcgetattr(self._tty_fd)
+        new_attrs[3] = new_attrs[3] & ~termios.ECHOCTL
+        termios.tcsetattr(self._tty_fd, termios.TCSANOW, new_attrs)
 
     def _sync_plugin_configs(self):
         """Sync default plugin configurations to the config file."""
@@ -136,6 +146,10 @@ class Shell:
             except Exception as e:
                 print(f"Error loading {self.rc_file}: {e}")
 
+    def _clear_current_line(self):
+        sys.stdout.write("\r\033[2K")
+        sys.stdout.flush()
+
     def _build_style(self) -> Style:
         """Build prompt_toolkit style from config colors."""
         c = self.config.colors
@@ -182,6 +196,12 @@ class Shell:
         # Setup Key Bindings
         from prompt_toolkit.key_binding import KeyBindings
         kb = KeyBindings()
+
+
+        @kb.add('c-c')
+        def _(event):
+            self._interrupted = True
+            event.app.exit(exception=KeyboardInterrupt)
         
         @kb.add('c-r')
         async def _(event):
@@ -211,22 +231,38 @@ class Shell:
             key_bindings=kb
         )
 
-    
     def _setup_signal_handlers(self):
-        """Setup signal handlers for graceful shutdown."""
-        def signal_handler(signum, frame):
-            """Handle SIGINT (Ctrl+C) and SIGTERM."""
-            print("\nInterrupted")
-            self.executor.cleanup_processes()
+        def sigint_handler(signum, frame):
+            self._interrupted = True
+            self._clear_current_line()
+            try:
+                self.session.app.invalidate()
+            except Exception:
+                pass
+
+        def sigterm_handler(signum, frame):
+            print("\nTerminated")
             self._close_shell()
-            sys.exit(130 if signum == signal.SIGINT else 0)
-        
-        signal.signal(signal.SIGINT, signal_handler)
-        if hasattr(signal, 'SIGTERM'):
-            signal.signal(signal.SIGTERM, signal_handler)
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, sigint_handler)
+        signal.signal(signal.SIGTERM, sigterm_handler)
+
+        signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        signal.signal(signal.SIGTTIN, signal.SIG_IGN)
+        signal.signal(signal.SIGTSTP, signal.SIG_IGN)
+
 
     def _close_shell(self):
-        """Close shell gracefully."""
+        try:
+            termios.tcsetattr(
+                self._tty_fd,
+                termios.TCSANOW,
+                self._orig_term_attrs
+            )
+        except Exception:
+            pass
+
         self.executor.cleanup_processes()
         self.context.sync_to_environment()
         self.context.running = False
@@ -338,7 +374,7 @@ class Shell:
             prompt_html = self._build_text_prompt(venv_display, display_path, git_display, exit_code)
 
         # Build right prompt
-        rprompt = self._get_rprompt()
+        rprompt = self._get_rprompt() if self.config.input.rprompt else None
 
         return self.session.prompt(prompt_html, rprompt=rprompt)
 
@@ -402,12 +438,17 @@ class Shell:
             self.context.last_exit_code = 1
             self._print_error(f"internal error: {e}")
 
+
+
     def _execute_pipeline(self, pipeline: list[dict]) -> int:
-        """Execute a single pipeline and return the exit code of the last command."""
+        """Execute a single pipeline using process groups."""
+
         processes = []
         pipe_fds = []
         prev_pipe_read = None
         exit_code = 0
+        pgid = None
+        has_external = False  # ⭐ ВАЖНО
 
         def safe_close(fd):
             if fd is not None:
@@ -423,182 +464,94 @@ class Shell:
                 stdin_file = cmd_info["stdin_file"]
                 stdout_file = cmd_info["stdout_file"]
                 append = cmd_info.get("append", False)
-                background = cmd_info.get("background", False)
 
                 is_last = i == len(pipeline) - 1
-                
-                # Background processes can't be part of a pipeline
-                if background and len(pipeline) > 1:
-                    self._print_error("background processes cannot be used in pipelines")
-                    return 1
+                current_stdin = prev_pipe_read if i > 0 else None
 
-                # Initialize stdin from previous pipe or input redirection
-                current_stdin = prev_pipe_read
-                if i == 0:
-                    current_stdin = None
-
-                # Handle input redirection (takes precedence over pipe)
                 if stdin_file:
-                    try:
-                        fd_in = os.open(stdin_file, os.O_RDONLY)
-                        # Close previous stdin if it was from a pipe
-                        if current_stdin is not None:
-                            safe_close(current_stdin)
-                        current_stdin = fd_in
-                    except FileNotFoundError:
-                        self._print_error(f"no such file or directory: {stdin_file}")
-                        # Clean up before returning
-                        for fd in pipe_fds:
-                            safe_close(fd)
-                        return 1
-                    except OSError as e:
-                        self._print_error(f"cannot open file {stdin_file}: {e}")
-                        for fd in pipe_fds:
-                            safe_close(fd)
-                        return 1
+                    fd_in = os.open(stdin_file, os.O_RDONLY)
+                    if current_stdin is not None:
+                        safe_close(current_stdin)
+                    current_stdin = fd_in
 
-                # Initialize stdout - will be pipe or output redirection
                 current_stdout = None
-                pipe_read = None
-                pipe_write = None
+                pipe_read = pipe_write = None
 
-                # Create pipe for next command if not last
                 if not is_last:
                     pipe_read, pipe_write = os.pipe()
                     pipe_fds.extend([pipe_read, pipe_write])
                     current_stdout = pipe_write
-                
-                # Handle output redirection (takes precedence over pipe)
-                # For background processes, redirect to /dev/null if no file specified
-                if background and not stdout_file:
-                    stdout_file = os.devnull
-                    append = False
-                
+
                 if stdout_file:
-                    try:
-                        flags = os.O_WRONLY | os.O_CREAT
-                        if append:
-                            flags |= os.O_APPEND
-                        else:
-                            flags |= os.O_TRUNC
-                        
-                        fd_out = os.open(stdout_file, flags, 0o644)
-                        # Close pipe write end if we're redirecting to file
-                        if current_stdout is not None:
-                            safe_close(current_stdout)
-                            # Also close pipe_read since we won't use it
-                            if pipe_read is not None:
-                                safe_close(pipe_read)
-                                pipe_read = None
-                        current_stdout = fd_out
-                    except OSError as e:
-                        self._print_error(f"cannot open file {stdout_file}: {e}")
-                        # Clean up before returning
-                        for fd in pipe_fds:
-                            safe_close(fd)
-                        return 1
-                
-                # For background processes, redirect stdin from /dev/null if not specified
-                if background and not stdin_file and current_stdin is None:
-                    try:
-                        current_stdin = os.open(os.devnull, os.O_RDONLY)
-                    except OSError:
-                        pass
+                    flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_TRUNC)
+                    fd_out = os.open(stdout_file, flags, 0o644)
+                    if current_stdout is not None:
+                        safe_close(current_stdout)
+                        safe_close(pipe_read)
+                        pipe_read = None
+                    current_stdout = fd_out
 
                 command = self.commands.get(cmd_name)
 
                 if command:
-                    # Execute builtin command
-                    stdin_fd = os.dup(current_stdin) if current_stdin is not None else None
-                    stdout_fd = os.dup(current_stdout) if current_stdout is not None else None
-                    
                     thread = self.executor.execute_builtin(
-                        command, args, stdin_fd, stdout_fd
+                        command, args, current_stdin, current_stdout
                     )
                     processes.append(thread)
-
-                    safe_close(current_stdout)
-                    safe_close(current_stdin)
                 else:
-                    # Execute external command
-                    try:
-                        process = self.executor.execute_external(
-                            cmd_name, args, current_stdin, current_stdout
-                        )
-                        processes.append(process)
+                    process = self.executor.execute_external(
+                        cmd_name,
+                        args,
+                        current_stdin,
+                        current_stdout,
+                        pgid=pgid,
+                    )
 
-                        safe_close(current_stdout)
-                        safe_close(current_stdin)
-                    except FileNotFoundError:
-                        self._print_error(f"command not found: {cmd_name}")
-                        # Clean up before returning
-                        for fd in pipe_fds:
-                            safe_close(fd)
-                        return 127
-                    except Exception as e:
-                        self._print_error(f"failed to execute {cmd_name}: {e}")
-                        # Clean up before returning
-                        for fd in pipe_fds:
-                            safe_close(fd)
-                        return 1
+                    if pgid is None:
+                        pgid = process.pid
 
-                # Only set prev_pipe_read if we actually have a pipe (not redirected to file)
-                if pipe_read is not None:
-                    prev_pipe_read = pipe_read
-                else:
-                    # If we redirected output to file, there's no pipe for next command
-                    prev_pipe_read = None
+                    has_external = True
+                    processes.append(process)
 
-            # Handle background processes
-            if background and processes:
-                bg_process = processes[-1]  # Last process is the background one
-                bg_info = {
-                    "pid": None,
-                    "cmd": f"{cmd_name} {' '.join(args)}",
-                    "process": bg_process
-                }
-                
-                if isinstance(bg_process, subprocess.Popen):
-                    bg_info["pid"] = bg_process.pid
-                    # Don't wait for background process
-                    self.context._background_processes.append(bg_info)
-                    print(f"[{bg_info['pid']}] {bg_info['cmd']}")
-                    return 0  # Background processes return success immediately
-                else:
-                    # Builtin commands can't really run in background properly
-                    # but we'll start them and not wait
-                    self.context._background_processes.append(bg_info)
-                    print(f"[background] {bg_info['cmd']}")
-                    return 0
-            
-            # Wait for all processes in the pipeline
+                safe_close(current_stdout)
+                safe_close(current_stdin)
+                prev_pipe_read = pipe_read
+
+            if has_external and pgid is not None:
+                try:
+                    os.tcsetpgrp(self._tty_fd, pgid)
+                except Exception:
+                    pass
+
             for idx, p in enumerate(processes):
-                is_last_process = idx == len(processes) - 1
+                is_last = idx == len(processes) - 1
                 if isinstance(p, threading.Thread):
                     p.join()
-                    # Only use exit code from last builtin command in pipeline
-                    if is_last_process:
+                    if is_last:
                         exit_code = self.context.last_exit_code
                 else:
                     exit_code = p.wait()
-                    # Update context for consistency
-                    if is_last_process:
+
+                    if is_last:
+                        if exit_code < 0:
+                            exit_code = 128 + (-exit_code)
+
                         self.context.last_exit_code = exit_code
 
             return exit_code
 
-        except Exception as e:
-            self._print_error(f"Pipeline error: {e}")
-            return 1
         finally:
-            # Clear finished processes from executor's memory
+            if has_external:
+                try:
+                    os.tcsetpgrp(self._tty_fd, self._shell_pgid)
+                except Exception:
+                    pass
+
             self.executor.clear_finished()
-            
-            # Ensure all pipeline-internal FDs are closed
+
             for fd in pipe_fds:
                 safe_close(fd)
-            
-            # Clean up prev_pipe_read if it was left open
+
             if prev_pipe_read is not None:
                 safe_close(prev_pipe_read)
 
@@ -607,11 +560,19 @@ class Shell:
             try:
                 try:
                     user_input = self._get_input()
-                except (KeyboardInterrupt, EOFError):
-                    self._close_shell()
+                    
+                    if self._interrupted:
+                        self._interrupted = False
+                        continue
+
+                except KeyboardInterrupt:
+                    self._interrupted = False
+                    continue
+
+                except EOFError:
                     return
 
-                # Measure command execution time (after user input is received)
+                # Measure command execution time
                 start_time = time.perf_counter()
                 self._execute_line(user_input)
                 end_time = time.perf_counter()
@@ -621,3 +582,4 @@ class Shell:
             except Exception as e:
                 print(f"Internal error: {e}")
                 self._last_command_duration = None
+

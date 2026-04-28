@@ -11,6 +11,7 @@ from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
 from axonix.errors.base_error import CLIError
 from axonix.utils.logger import get_logger
+import signal
 
 
 class ProcessResult(Protocol):
@@ -39,11 +40,44 @@ def managed_fd(fd: Optional[int], mode: str = "r"):
 
 class CommandExecutor:
     """Executes commands with proper resource management."""
-    
+
     def __init__(self, context: ExecutionContext):
         self.context = context
         self._active_processes: list[Union[subprocess.Popen, threading.Thread]] = []
         self.logger = get_logger()
+
+    def _get_fresh_path(self) -> str:
+        """Get fresh PATH from the parent shell."""
+        try:
+            shell = os.environ.get('SHELL', '/bin/zsh')
+            # Try to source the shell's rc file to get updated PATH
+            rc_file = '~/.zshrc' if shell.endswith('zsh') else '~/.bashrc'
+            command = f'source {rc_file} && echo $PATH'
+            result = subprocess.run(
+                [shell, '-c', command],
+                capture_output=True,
+                text=True,
+                timeout=2
+            )
+            if result.returncode == 0:
+                fresh_path = result.stdout.strip()
+                if fresh_path:
+                    return fresh_path
+            # If sourcing fails, try without sourcing
+            result = subprocess.run(
+                [shell, '-c', 'echo $PATH'],
+                capture_output=True,
+                text=True,
+                timeout=1
+            )
+            if result.returncode == 0:
+                fresh_path = result.stdout.strip()
+                if fresh_path:
+                    return fresh_path
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
+            pass
+        # Fallback to current PATH
+        return os.environ.get('PATH', '')
     
     def execute_builtin(
         self,
@@ -101,31 +135,48 @@ class CommandExecutor:
         args: list[str],
         stdin_fd: Optional[int] = None,
         stdout_fd: Optional[int] = None,
+        pgid: Optional[int] = None,
     ) -> subprocess.Popen:
-        """Execute an external command with proper resource management."""
-        # Validate command name to prevent command injection
         if not cmd_name or not isinstance(cmd_name, str):
             raise ValueError(f"Invalid command name: {cmd_name}")
-        
-        # Validate args
-        if not isinstance(args, list):
-            raise ValueError("Args must be a list")
-        
-        # Sanitize args - ensure all are strings
+
         sanitized_args = [str(arg) for arg in args]
-        
+
+        old_handler = signal.getsignal(signal.SIGINT)
+
         try:
+            # Shell ignores Ctrl+C while command runs
+            signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+            # Get fresh environment with updated PATH
+            env = os.environ.copy()
+            fresh_path = self._get_fresh_path()
+            if fresh_path:
+                env['PATH'] = fresh_path
+
+            def preexec():
+                # Create or join process group
+                if pgid is None:
+                    os.setpgid(0, 0)
+                else:
+                    os.setpgid(0, pgid)
+
+                # Child receives Ctrl+C
+                signal.signal(signal.SIGINT, signal.SIG_DFL)
+
             process = subprocess.Popen(
                 [cmd_name] + sanitized_args,
                 stdin=stdin_fd,
                 stdout=stdout_fd,
+                env=env,
+                preexec_fn=preexec,
             )
+
             self._active_processes.append(process)
             return process
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Command not found: {cmd_name}")
-        except ValueError as e:
-            raise ValueError(f"Invalid arguments for {cmd_name}: {e}")
+
+        finally:
+            signal.signal(signal.SIGINT, old_handler)
     
     def clear_finished(self):
         """Remove finished processes and threads from the active list."""
