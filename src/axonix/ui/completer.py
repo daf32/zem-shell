@@ -1,7 +1,6 @@
-from prompt_toolkit.completion import Completer, Completion, PathCompleter, CompleteEvent
+from prompt_toolkit.completion import Completer, Completion, CompleteEvent
 from prompt_toolkit.document import Document
 from typing import Iterable, List, Optional, Set
-import os
 from axonix.utils.executables import get_system_commands
 from axonix.ui.completers.registry import CompleterRegistry
 from axonix.ui.completers.defaults import (

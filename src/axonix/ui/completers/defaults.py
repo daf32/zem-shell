@@ -23,10 +23,9 @@ def _get_file_type_info(path: str) -> str:
         elif stat.S_ISLNK(mode):
             # Check if symlink target exists
             if os.path.exists(expanded):
-                target = os.readlink(expanded)
                 if os.path.isdir(expanded):
-                    return f"🔗 → dir"
-                return f"🔗 → file"
+                    return "🔗 → dir"
+                return "🔗 → file"
             return "🔗 broken"
         elif stat.S_ISREG(mode):
             # Show file size for regular files

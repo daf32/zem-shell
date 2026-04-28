@@ -20,5 +20,31 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.11",
     "pytest>=7.4.0",
+    "ruff>=0.6",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["dist", ".venv"]
+
+[tool.ruff.lint]
+# Soft on-ramp: just pyflakes (unused imports, unused variables,
+# undefined names). The codebase isn't formatted to a single style
+# yet, so import sorting / pycodestyle are intentionally left out for
+# now. Ratchet up to ["E", "F", "I", "B"] in a follow-up PR once the
+# baseline is clean.
+select = ["F"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src"]
+ignore_missing_imports = true
+# Loose by default — the codebase isn't fully typed yet. There is a known
+# baseline of issues (see PR description); fix them incrementally and
+# tighten via `[[tool.mypy.overrides]]` per-module rather than flipping
+# strict on globally.
+check_untyped_defs = false
+warn_unused_ignores = true
