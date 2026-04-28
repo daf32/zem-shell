@@ -249,22 +249,27 @@ class ThemeManager:
         except Exception:
             return None
     
+    HTTP_TIMEOUT = 10  # seconds; theme install blocks the shell
+
     def install_theme(self, url: str) -> Optional[str]:
         """Download and install a theme from URL."""
-        import urllib.request
+        import shutil
         import tempfile
-        
+        import urllib.request
+
         try:
             tmp_fd, tmp_path = tempfile.mkstemp(suffix='.json')
             os.close(tmp_fd)
 
-            urllib.request.urlretrieve(url, tmp_path)
+            with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response, \
+                    open(tmp_path, "wb") as out:
+                shutil.copyfileobj(response, out)
             with open(tmp_path, "r", encoding="utf-8") as f:
                 json.load(f)
-            
+
             name = self.import_theme(tmp_path)
             os.unlink(tmp_path)
-            
+
             return name
         except Exception:
             return None

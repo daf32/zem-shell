@@ -35,6 +35,7 @@ class WeatherCommand(BaseCommand):
     
     API_URL = "https://api.open-meteo.com/v1/forecast"
     GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
+    HTTP_TIMEOUT = 10  # seconds; the shell prompt blocks on this
 
     def get_completer(self):
         return WeatherCompleter()
@@ -89,9 +90,9 @@ class WeatherCommand(BaseCommand):
         params = urllib.parse.urlencode({"name": city, "count": 1, "language": "en", "format": "json"})
         url = f"{self.GEO_URL}?{params}"
         
-        with urllib.request.urlopen(url) as response:
+        with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response:
             data = json.load(response)
-            
+
         if not data.get("results"):
             raise ValueError(f"City '{city}' not found.")
             
@@ -102,7 +103,7 @@ class WeatherCommand(BaseCommand):
         params = urllib.parse.urlencode({"latitude": lat, "longitude": lon, "current_weather": "true"})
         url = f"{self.API_URL}?{params}"
         
-        with urllib.request.urlopen(url) as response:
+        with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response:
             return json.load(response)
 
     def _get_weather_icon(self, code):
