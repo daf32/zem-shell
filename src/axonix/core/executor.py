@@ -140,6 +140,15 @@ class CommandExecutor:
         if not cmd_name or not isinstance(cmd_name, str):
             raise ValueError(f"Invalid command name: {cmd_name}")
 
+        # Resolve once up-front so missing binaries surface as a clean
+        # UnknownCommandError instead of leaking through Popen's preexec
+        # path (where the child error can be reported as ENOENT, ENAMETOOLONG,
+        # or other OSError codes depending on platform/sandbox).
+        import shutil
+        from axonix.errors.input_error import UnknownCommandError
+        if "/" not in cmd_name and shutil.which(cmd_name) is None:
+            raise UnknownCommandError(cmd_name)
+
         sanitized_args = [str(arg) for arg in args]
 
         old_handler = signal.getsignal(signal.SIGINT)
@@ -164,13 +173,20 @@ class CommandExecutor:
                 # Child receives Ctrl+C
                 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
-            process = subprocess.Popen(
-                [cmd_name] + sanitized_args,
-                stdin=stdin_fd,
-                stdout=stdout_fd,
-                env=env,
-                preexec_fn=preexec,
-            )
+            try:
+                process = subprocess.Popen(
+                    [cmd_name] + sanitized_args,
+                    stdin=stdin_fd,
+                    stdout=stdout_fd,
+                    env=env,
+                    preexec_fn=preexec,
+                )
+            except FileNotFoundError:
+                # Surface as a normal user-facing CLI error (exit 2) instead of
+                # the generic "internal error" path used by `except Exception`
+                # in Shell._execute_line.
+                from axonix.errors.input_error import UnknownCommandError
+                raise UnknownCommandError(cmd_name)
 
             self._active_processes.append(process)
             return process
