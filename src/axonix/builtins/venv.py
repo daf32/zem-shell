@@ -1,6 +1,6 @@
 from axonix.builtins.base import BaseCommand
 from axonix.utils.venv import activate_venv, deactivate_venv, find_venv
-from typing_extensions import TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext

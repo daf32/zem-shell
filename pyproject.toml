@@ -10,7 +10,6 @@ authors = [
 dependencies = [
     "prompt-toolkit>=3.0.52",
     "pydantic-settings>=2.12.0",
-    "pytest>=7.4.0",
 ]
 [project.scripts]
 ax = "axonix.main:main"
@@ -18,3 +17,8 @@ ax = "axonix.main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+]
