@@ -66,14 +66,26 @@ class ColorScheme(BaseModel):
 class VenvScheme(BaseModel):
     auto: bool = True
 
+def _legacy_config_path() -> str:
+    """Path to the historical config.json that lived in the project root."""
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json"))
+
+
 def get_config_path() -> str:
-    """Get config file path, allowing override via environment variable."""
+    """Resolve the user-level config file path.
+
+    Order of preference:
+    1. ``AXONIX_CONFIG_PATH`` environment variable (explicit override)
+    2. ``$XDG_CONFIG_HOME/axonix/config.json`` (defaults to
+       ``~/.config/axonix/config.json``)
+    """
     env_path = os.getenv("AXONIX_CONFIG_PATH")
     if env_path:
-        return os.path.abspath(env_path)
-    
-    # Default to config.json in project root
-    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json"))
+        return os.path.abspath(os.path.expanduser(env_path))
+
+    xdg_home = os.getenv("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.abspath(os.path.join(xdg_home, "axonix", "config.json"))
+
 
 CONFIG_PATH = get_config_path()
 
@@ -123,14 +135,35 @@ class AppConfig(BaseSettings):
             env_settings,
         )
 
-# Auto-create file if it doesn't exist
-if not os.path.exists(CONFIG_PATH):
+def _ensure_config_file(path: str) -> None:
+    """Make sure ``path`` exists, migrating from the legacy project-root
+    location when possible, otherwise creating a default config."""
+    if os.path.exists(path):
+        return
+
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except OSError:
+        return
+
+    legacy = _legacy_config_path()
+    if legacy != path and os.path.isfile(legacy):
+        try:
+            import shutil
+            shutil.move(legacy, path)
+            return
+        except OSError:
+            pass
+
     import json
     _default_config = AppConfig()
     try:
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(_default_config.model_dump(), f, indent=4)
-    except Exception:
+    except OSError:
         pass
+
+
+_ensure_config_file(CONFIG_PATH)
 
 config = AppConfig()

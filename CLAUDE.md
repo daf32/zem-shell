@@ -29,7 +29,7 @@ uv run pytest tests/test_parser.py::test_quotes_and_variables -v
 uv run python scripts/build_mac_app.py
 ```
 
-`AXONIX_CONFIG_PATH` overrides the path to `config.json`. By default the file at the repo root is used (see `get_config_path()` in `src/axonix/config/settings.py`).
+`AXONIX_CONFIG_PATH` overrides the path to `config.json`. The default location is `$XDG_CONFIG_HOME/axonix/config.json` (typically `~/.config/axonix/config.json`); see `get_config_path()` in `src/axonix/config/settings.py`. On first run a legacy `<repo_root>/config.json` is auto-migrated to the new location.
 
 ## Architecture
 

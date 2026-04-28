@@ -81,7 +81,6 @@ Change the shell working directory... (etc)
 
 ```text
 axonix-shell/
-├── config.json         # JSON configuration (Operators & Settings)
 ├── pyproject.toml      # Dependency management
 └── src/
     └── axonix/         # Core package
@@ -91,6 +90,9 @@ axonix-shell/
         ├── config/     # Configuration Models
         └── errors/     # Custom exception hierarchy
 ```
+
+The user-level configuration lives at `~/.config/axonix/config.json`
+(or `$XDG_CONFIG_HOME/axonix/config.json`). Override with `AXONIX_CONFIG_PATH`.
 
 ## ⚙️ Configuration (`config.json`)
 
