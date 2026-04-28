@@ -13,6 +13,7 @@ from axonix.errors.base_error import CLIError
 from typing import Dict, Optional
 import os
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -383,6 +384,11 @@ class Shell:
         from axonix.utils.colors import error_tag
         print_formatted_text(HTML(f'{error_tag(self.config)} {message}'), file=sys.stderr)
 
+    def _write_background_notice(self, pid: int):
+        """Print a bash-style `[bg] <pid>` notice for a detached pipeline."""
+        sys.stderr.write(f"[bg] {pid}\n")
+        sys.stderr.flush()
+
     def _add_history(self, entry: str):
         """Add entry to in-memory history respecting limits and settings."""
         history_cfg = self.config.history
@@ -449,6 +455,10 @@ class Shell:
         exit_code = 0
         pgid = None
         has_external = False  # ⭐ ВАЖНО
+        # Honour `&` only when it terminates a pipeline whose last stage is an
+        # external process; backgrounding a pure-builtin pipeline doesn't make
+        # sense (builtins run in this process and would still mutate context).
+        is_background = bool(pipeline and pipeline[-1].get("background"))
 
         def safe_close(fd):
             if fd is not None:
@@ -517,14 +527,40 @@ class Shell:
                 safe_close(current_stdin)
                 prev_pipe_read = pipe_read
 
-            if has_external and pgid is not None:
+            # Only hand the terminal to the foreground process group; for
+            # background pipelines the shell keeps the tty so the prompt
+            # stays interactive.
+            if has_external and pgid is not None and not is_background:
                 try:
                     os.tcsetpgrp(self._tty_fd, pgid)
                 except Exception:
                     pass
 
+            last_proc = processes[-1] if processes else None
+            background_external = (
+                is_background
+                and isinstance(last_proc, subprocess.Popen)
+            )
+
+            if is_background and not background_external:
+                # Backgrounding a pure-builtin tail isn't honoured; warn once
+                # and fall back to foreground execution to preserve correctness.
+                self._print_error(
+                    "background (`&`) is only supported for external commands; "
+                    "running this pipeline in the foreground"
+                )
+
             for idx, p in enumerate(processes):
                 is_last = idx == len(processes) - 1
+                if background_external and is_last:
+                    # Detach the trailing external process; its exit will be
+                    # reaped on shell shutdown via `cleanup_processes`.
+                    self.context._background_processes.append(p)
+                    self._write_background_notice(p.pid)
+                    exit_code = 0
+                    self.context.last_exit_code = 0
+                    continue
+
                 if isinstance(p, threading.Thread):
                     p.join()
                     if is_last:
@@ -541,7 +577,7 @@ class Shell:
             return exit_code
 
         finally:
-            if has_external:
+            if has_external and not is_background:
                 try:
                     os.tcsetpgrp(self._tty_fd, self._shell_pgid)
                 except Exception:
