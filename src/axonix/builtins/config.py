@@ -87,14 +87,14 @@ class ConfigCommand(BaseCommand):
 
     def execute(self, args: list[str], context: ExecutionContext, stdin=None, stdout=None):
         from axonix.config.settings import CONFIG_PATH
-        
+
         if not args:
             self._write(f"Usage: {self.usage}\n", stdout)
             self._write("Subcommands: list, get, set, reload, path, edit\n", stdout)
-            return
+            return 0
 
         command = args[0].lower()
-        
+
         # Load current raw JSON
         if os.path.exists(CONFIG_PATH):
             with open(CONFIG_PATH, "r") as f:
@@ -104,47 +104,44 @@ class ConfigCommand(BaseCommand):
 
         if command == "list":
             self._print_dict(data, stdout=stdout)
-            
-        elif command == "get":
+            return 0
+
+        if command == "get":
             if len(args) < 2:
                 self._write("Usage: config get <key>\n", stdout)
-                return
+                return 0
             key = args[1]
             val = self._get_value(data, key)
             if val is not None:
                 self._write(f"{val}\n", stdout)
-            else:
-                self._write(f"Key '{key}' not found.\n", stdout)
-                context.last_exit_code = 1
-                
-        elif command == "set":
+                return 0
+            self._write(f"Key '{key}' not found.\n", stdout)
+            return 1
+
+        if command == "set":
             if len(args) < 3:
                 self._write("Usage: config set <key> <value>\n", stdout)
-                return
+                return 0
             key = args[1]
             value_str = " ".join(args[2:])
-            
             value = self._infer_type(value_str)
-            
             if self._set_value(data, key, value):
                 with open(CONFIG_PATH, "w") as f:
                     json.dump(data, f, indent=4)
-                
                 self._write(f"✓ Set '{key}' = {repr(value)}\n", stdout)
-                
-                # Hot reload the setting if possible
                 self._hot_reload_setting(context, key, value, stdout)
-            else:
-                self._write(f"✗ Failed to set '{key}'\n", stdout)
-                context.last_exit_code = 1
-        
-        elif command == "reload":
-            self._reload_config(context, stdout)
-        
-        elif command == "path":
+                return 0
+            self._write(f"✗ Failed to set '{key}'\n", stdout)
+            return 1
+
+        if command == "reload":
+            return self._reload_config(context, stdout)
+
+        if command == "path":
             self._write(f"{CONFIG_PATH}\n", stdout)
-        
-        elif command == "edit":
+            return 0
+
+        if command == "edit":
             import shlex
             import subprocess
             editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "nano"
@@ -152,62 +149,63 @@ class ConfigCommand(BaseCommand):
             editor_argv = shlex.split(editor)
             if not editor_argv:
                 self._write("✗ $EDITOR is empty\n", stdout)
-                context.last_exit_code = 1
-                return
+                return 1
             self._write(f"Opening {CONFIG_PATH} with {editor}...\n", stdout)
             try:
                 subprocess.run([*editor_argv, CONFIG_PATH], check=False)
             except FileNotFoundError:
                 self._write(f"✗ Editor '{editor_argv[0]}' not found\n", stdout)
-                context.last_exit_code = 1
-                return
+                return 1
             # Reload after editing
             self._write("Reloading configuration...\n", stdout)
-            self._reload_config(context, stdout)
-        
-        else:
-            self._write(f"Unknown subcommand: {command}\n", stdout)
-            self._write(f"Usage: {self.usage}\n", stdout)
-            context.last_exit_code = 1
+            return self._reload_config(context, stdout)
 
-    def _reload_config(self, context: ExecutionContext, stdout):
-        """Reload configuration from file and apply changes."""
+        self._write(f"Unknown subcommand: {command}\n", stdout)
+        self._write(f"Usage: {self.usage}\n", stdout)
+        return 1
+
+    def _reload_config(self, context: ExecutionContext, stdout) -> int:
+        """Reload configuration from file and apply changes.
+
+        Returns the exit code (0 on success, 1 on failure).
+        """
         from axonix.config.settings import AppConfig
-        
+
         if not hasattr(context, '_shell') or context._shell is None:
             self._write("✗ Cannot reload: shell reference not found\n", stdout)
-            return
-        
+            return 1
+
         shell = context._shell
-        
+
         try:
             # Create new config instance (reads from file)
             new_config = AppConfig()
-            
+
             # Update shell config
             shell.config = new_config
-            
+
             # Rebuild style
             shell.style = shell._build_style()
             if hasattr(shell, 'session') and shell.session:
                 shell.session.style = shell.style
-            
+
             # Invalidate caches
             if hasattr(shell.session, 'lexer') and shell.session.lexer:
                 lexer = shell.session.lexer
                 if hasattr(lexer, 'invalidate_cache'):
                     lexer.invalidate_cache()
-            
+
             if hasattr(shell.session, 'completer') and shell.session.completer:
                 completer = shell.session.completer
                 if hasattr(completer, 'invalidate_cache'):
                     completer.invalidate_cache()
-            
+
             self._write("✓ Configuration reloaded successfully\n", stdout)
-            
+            return 0
+
         except Exception as e:
             self._write(f"✗ Failed to reload config: {e}\n", stdout)
-            context.last_exit_code = 1
+            return 1
 
     def _hot_reload_setting(self, context: ExecutionContext, key: str, value: Any, stdout):
         """Try to hot-reload a specific setting."""

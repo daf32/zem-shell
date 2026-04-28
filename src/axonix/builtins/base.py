@@ -211,20 +211,30 @@ class BaseCommand:
             )
 
     def execute(
-        self, 
-        args: list[str], 
-        context: "ExecutionContext", 
-        stdin: Optional[TextIO] = None, 
-        stdout: Optional[TextIO] = None
-    ) -> None:
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin: Optional[TextIO] = None,
+        stdout: Optional[TextIO] = None,
+    ) -> Optional[int]:
         """Execute the command.
-        
+
         Args:
             args: Command arguments
             context: Shell execution context (variables, history, commands, etc.)
             stdin: Input stream
             stdout: Output stream
-            
+
+        Returns:
+            Exit code (``int``). Returning ``None`` is treated as ``0`` for
+            backward compatibility with older builtins / plugins, but new
+            commands should return an explicit ``int`` — writing to
+            ``context.last_exit_code`` from inside ``execute`` is unsafe in
+            pipelines (the builtin runs in a worker thread, and the shared
+            attribute is shared with sibling stages). Raise a ``CLIError``
+            subclass for user-facing errors instead; the executor maps its
+            ``exit_code`` automatically.
+
         Raises:
             NotImplementedError: Must be implemented in subclasses
         """
