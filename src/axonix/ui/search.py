@@ -1,12 +1,11 @@
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout.containers import Window, HSplit, VSplit
+from prompt_toolkit.layout.containers import Window, HSplit
 from prompt_toolkit.layout.controls import FormattedTextControl, BufferControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.layout.dimension import Dimension
-from prompt_toolkit.formatted_text import to_formatted_text, FormattedText
-from prompt_toolkit.widgets import Frame, TextArea
+from prompt_toolkit.widgets import Frame
 from prompt_toolkit.styles import Style
 import re
 from typing import List, Tuple

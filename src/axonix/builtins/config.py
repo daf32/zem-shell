@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, List, Optional
+from typing import Any, List
 from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
 from axonix.ui.completers.base import BaseArgCompleter
@@ -86,7 +86,7 @@ class ConfigCommand(BaseCommand):
             return ConfigCompleter({})
 
     def execute(self, args: list[str], context: ExecutionContext, stdin=None, stdout=None):
-        from axonix.config.settings import CONFIG_PATH, AppConfig
+        from axonix.config.settings import CONFIG_PATH
         
         if not args:
             self._write(f"Usage: {self.usage}\n", stdout)

@@ -1,4 +1,4 @@
-from typing import Dict, Type
+from typing import Dict
 from axonix.ui.completers.base import BaseArgCompleter
 
 class CompleterRegistry:
