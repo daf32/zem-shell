@@ -145,9 +145,22 @@ class ConfigCommand(BaseCommand):
             self._write(f"{CONFIG_PATH}\n", stdout)
         
         elif command == "edit":
-            editor = os.environ.get("EDITOR", os.environ.get("VISUAL", "nano"))
+            import shlex
+            import subprocess
+            editor = os.environ.get("EDITOR") or os.environ.get("VISUAL") or "nano"
+            # Allow `EDITOR="vim -p"` style values without going through a shell.
+            editor_argv = shlex.split(editor)
+            if not editor_argv:
+                self._write("✗ $EDITOR is empty\n", stdout)
+                context.last_exit_code = 1
+                return
             self._write(f"Opening {CONFIG_PATH} with {editor}...\n", stdout)
-            os.system(f'{editor} "{CONFIG_PATH}"')
+            try:
+                subprocess.run([*editor_argv, CONFIG_PATH], check=False)
+            except FileNotFoundError:
+                self._write(f"✗ Editor '{editor_argv[0]}' not found\n", stdout)
+                context.last_exit_code = 1
+                return
             # Reload after editing
             self._write("Reloading configuration...\n", stdout)
             self._reload_config(context, stdout)
