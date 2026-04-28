@@ -46,39 +46,6 @@ class CommandExecutor:
         self._active_processes: list[Union[subprocess.Popen, threading.Thread]] = []
         self.logger = get_logger()
 
-    def _get_fresh_path(self) -> str:
-        """Get fresh PATH from the parent shell."""
-        try:
-            shell = os.environ.get('SHELL', '/bin/zsh')
-            # Try to source the shell's rc file to get updated PATH
-            rc_file = '~/.zshrc' if shell.endswith('zsh') else '~/.bashrc'
-            command = f'source {rc_file} && echo $PATH'
-            result = subprocess.run(
-                [shell, '-c', command],
-                capture_output=True,
-                text=True,
-                timeout=2
-            )
-            if result.returncode == 0:
-                fresh_path = result.stdout.strip()
-                if fresh_path:
-                    return fresh_path
-            # If sourcing fails, try without sourcing
-            result = subprocess.run(
-                [shell, '-c', 'echo $PATH'],
-                capture_output=True,
-                text=True,
-                timeout=1
-            )
-            if result.returncode == 0:
-                fresh_path = result.stdout.strip()
-                if fresh_path:
-                    return fresh_path
-        except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
-            pass
-        # Fallback to current PATH
-        return os.environ.get('PATH', '')
-    
     def execute_builtin(
         self,
         command: BaseCommand,
@@ -148,11 +115,11 @@ class CommandExecutor:
             # Shell ignores Ctrl+C while command runs
             signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-            # Get fresh environment with updated PATH
+            # `os.environ` already reflects PATH updates done via `export`/`set`
+            # builtins (the shell syncs them in `context.sync_to_environment`),
+            # so just inherit it without spawning a sub-shell to re-source rc
+            # files on every command.
             env = os.environ.copy()
-            fresh_path = self._get_fresh_path()
-            if fresh_path:
-                env['PATH'] = fresh_path
 
             def preexec():
                 # Create or join process group
