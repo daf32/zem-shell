@@ -22,6 +22,14 @@ All notable changes to Axonix are documented here. The format follows
 - `help`, `theme`, `logo`, `history`, `weather` print plain text when
   piped or redirected instead of writing colours to the terminal.
 
+- `set` lists variables when called bare, gains `-x` (export) and `-e`
+  (erase). `export` accepts bare `NAME` (promote), `-n NAME` (unexport)
+  and lists only exported variables in re-sourceable form. `unset` takes
+  several names and no longer fails on unknown ones. `get` distinguishes
+  an empty value from an unset variable. `alias` output is re-sourceable
+  and no longer mangles values containing quotes; `unalias -a` added.
+  Missing aliases/variables report on stderr with exit code 1.
+
 ### Added
 - `BaseCommand.execute` may declare `stderr=`; `_write_err()` helper.
 - `ExecutionContext.set_var/unset_var/export_var/unexport_var/child_env`.
@@ -36,6 +44,8 @@ All notable changes to Axonix are documented here. The format follows
 - Test fixtures: `full_shell` (real builtin registry, headless) and `run()`.
 
 ### Fixed
+- `echo a\'b` printed `ab`: the tokenizer dropped the backslash but kept
+  the quote, which the quote-removal pass then treated as an opener.
 - Builtin output was silently lost on `>` redirects and builtin-to-builtin
   pipes because the main thread and the worker thread closed the same file
   descriptor.

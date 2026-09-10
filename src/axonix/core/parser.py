@@ -161,6 +161,11 @@ class Parser:
             ch = text[i]
             
             if escaped:
+                # Keep the backslash: quotes stay in the token until
+                # `_remove_quotes`, which must see the escape to know this
+                # character is literal (otherwise `a\'b` would read as a
+                # quote opening).
+                current.append(self.config.operators.escape)
                 current.append(ch)
                 escaped = False
                 i += 1
