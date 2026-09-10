@@ -6,6 +6,7 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-09-10
 ### Changed
 - Python 3.10+ is supported (was 3.13+). `pip install zem` now works on
   any current Python; `uv tool install zem` still needs no Python at all.
