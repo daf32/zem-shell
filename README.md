@@ -41,6 +41,20 @@ Zem is a modular Python-based shell focused on extensibility and speed.
 
 ## 🚀 Installation
 
+### From PyPI
+
+```bash
+uv tool install zem      # recommended: uv fetches a suitable Python itself
+```
+
+or, with a Python 3.10+ already on your PATH:
+
+```bash
+pip install zem
+```
+
+### From source
+
 This project uses `uv` for dependency management.
 
 1. **Clone the repository**:

@@ -30,26 +30,31 @@ jobs:
         continue-on-error: true
 
   test:
-    name: Test (${{ matrix.os }})
+    name: Test (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        python: ["3.13"]
+        include:
+          - os: ubuntu-latest
+            python: "3.10"   # oldest supported
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          python-version: ${{ matrix.python }}
       - run: uv sync --group dev
       - name: Pytest
-        run: uv run pytest -q --junitxml=junit-${{ matrix.os }}.xml
+        run: uv run pytest -q --junitxml=junit-${{ matrix.os }}-py${{ matrix.python }}.xml
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: junit-${{ matrix.os }}
-          path: junit-${{ matrix.os }}.xml
+          name: junit-${{ matrix.os }}-py${{ matrix.python }}
+          path: junit-${{ matrix.os }}-py${{ matrix.python }}.xml
           retention-days: 7
 
   build:
