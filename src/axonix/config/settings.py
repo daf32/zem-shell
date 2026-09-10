@@ -165,9 +165,13 @@ def _ensure_config_file(path: str) -> None:
             pass
 
     import json
+    # Build the defaults *before* touching ``path``: ``AppConfig()`` reads
+    # ``CONFIG_PATH`` through ``JsonConfigSettingsSource``, and opening the
+    # file for writing first would leave an empty file for it to choke on.
+    defaults = AppConfig().model_dump()
     try:
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(AppConfig().model_dump(), f, indent=4)
+            json.dump(defaults, f, indent=4)
     except OSError:
         pass
 
