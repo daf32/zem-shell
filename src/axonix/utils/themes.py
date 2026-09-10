@@ -152,6 +152,7 @@ class ThemeManager:
             if hasattr(shell.config.colors, key):
                 setattr(shell.config.colors, key, value)
 
+        shell.config.active_theme = name
         self._rebuild_style(shell)
 
         self._save_theme_to_config(name)

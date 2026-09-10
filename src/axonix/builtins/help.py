@@ -84,13 +84,18 @@ class HelpCommand(BaseCommand):
         self._write("\nType 'help <command>' for detailed information.\n", stdout)
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
-    ):
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
+    ) -> int:
         commands = context.commands
 
         if not args:
             self.print_commands(commands, context, stdout)
-            return
+            return 0
 
         cmd_name = args[0]
         cmd = commands.get(cmd_name)
@@ -100,9 +105,9 @@ class HelpCommand(BaseCommand):
             if cmd_name in context.aliases:
                 alias_value = context.aliases[cmd_name]
                 self._write(f"'{cmd_name}' is an alias for: {alias_value}\n", stdout)
-                return
-            
-            self._write(f"help: command '{cmd_name}' not found\n", stdout)
+                return 0
+
+            self._write_err(f"help: command '{cmd_name}' not found\n", stderr)
             return 1
 
         # Detailed command info
@@ -121,4 +126,4 @@ class HelpCommand(BaseCommand):
             for ex in examples:
                 self._write(f"  {ex}\n", stdout)
         
-        self._write("", stdout)  # Empty line at the end
+        return 0

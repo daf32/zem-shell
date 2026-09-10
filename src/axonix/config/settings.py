@@ -131,9 +131,12 @@ class AppConfig(BaseSettings):
         file_secret_settings
     ):
         from pydantic_settings import JsonConfigSettingsSource
+        # Resolve the path per instance: `AXONIX_CONFIG_PATH` may change
+        # after import (tests point it at a temp file), and the class-level
+        # `json_file` default is frozen at definition time.
         return (
             init_settings,
-            JsonConfigSettingsSource(settings_cls),
+            JsonConfigSettingsSource(settings_cls, json_file=get_config_path()),
             env_settings,
         )
 

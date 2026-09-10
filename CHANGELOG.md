@@ -30,6 +30,15 @@ All notable changes to Axonix are documented here. The format follows
   and no longer mangles values containing quotes; `unalias -a` added.
   Missing aliases/variables report on stderr with exit code 1.
 
+- `cd` tracks the logical path (symlinks kept in `$PWD`), exports
+  `PWD`/`OLDPWD`, supports `~user`, errors on `cd -` only when `OLDPWD` is
+  unset, rejects extra arguments. `pwd` gains `-L`/`-P`. `echo` gains
+  `-n`, `-e`, `-E`. `history` parses arguments strictly, `-c` now also
+  clears the history file, `-d N` deletes one entry. `theme` uses the live
+  config, returns 1 on every failure and reports on stderr. `venv activate`
+  accepts a path; the silent `venv on`/`off` no-ops are gone. `help nope`
+  exits 1.
+
 ### Added
 - `BaseCommand.execute` may declare `stderr=`; `_write_err()` helper.
 - `ExecutionContext.set_var/unset_var/export_var/unexport_var/child_env`.
@@ -44,6 +53,9 @@ All notable changes to Axonix are documented here. The format follows
 - Test fixtures: `full_shell` (real builtin registry, headless) and `run()`.
 
 ### Fixed
+- `AppConfig` read the config path once at class definition, so changing
+  `AXONIX_CONFIG_PATH` after import (or in tests) was ignored.
+- Coloured builtins wrote CRLF line endings when redirected to a file.
 - `echo a\'b` printed `ab`: the tokenizer dropped the backslash but kept
   the quote, which the quote-removal pass then treated as an opener.
 - Builtin output was silently lost on `>` redirects and builtin-to-builtin

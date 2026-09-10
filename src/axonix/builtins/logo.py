@@ -14,7 +14,7 @@ class LogoCommand(BaseCommand):
 
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
-    ):
+    ) -> int:
         
         # Get colors from shell config if available
         c = None
@@ -51,3 +51,4 @@ class LogoCommand(BaseCommand):
                 (c.comment, "    A modern shell for developers"),
                 ("", "\n"),
             ], stdout)
+        return 0

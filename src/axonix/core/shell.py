@@ -9,7 +9,6 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
 from axonix.builtins import DEFAULT_USER_PLUGINS_DIR, load_plugins
@@ -22,6 +21,7 @@ from axonix.core.parser import Parser
 from axonix.errors.base_error import CLIError
 from axonix.errors.execute_error import ExecutionError
 from axonix.ui.completer import AxonixCompleter
+from axonix.ui.history import AxonixFileHistory
 from axonix.ui.lexer import AxonixLexer
 from axonix.utils.git import format_git_branch, get_git_info
 from axonix.utils.venv import activate_venv, get_venv_info
@@ -214,7 +214,7 @@ class Shell:
 
     def _setup_prompt_session(self):
         """Setup prompt_toolkit session with history, lexer and completer."""
-        history = FileHistory(self.history_file) if self.config.history.enable else None
+        history = AxonixFileHistory(self.history_file) if self.config.history.enable else None
         
         # Build style from config colors
         self.style = self._build_style()

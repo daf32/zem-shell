@@ -209,10 +209,18 @@ class BaseCommand:
             items: List of (style, text) tuples
             stdout: Output stream (default: sys.stdout)
         """
+        stream = stdout or sys.stdout
+        is_tty = getattr(stream, "isatty", lambda: False)()
+        if not is_tty:
+            # prompt_toolkit's output layer writes "\r\n" line endings even
+            # to plain files; write the text ourselves instead.
+            stream.write("".join(text for _style, text in items) + "\n")
+            return
+
         from prompt_toolkit import print_formatted_text
         from prompt_toolkit.formatted_text import FormattedText
 
-        print_formatted_text(FormattedText(items), file=stdout or sys.stdout)
+        print_formatted_text(FormattedText(items), file=stream)
     
     def _validate_identifier(
         self,
