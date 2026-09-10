@@ -1,4 +1,3 @@
-import json
 import os
 from typing import Any, List
 
@@ -7,6 +6,7 @@ from prompt_toolkit.document import Document
 
 from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
+from axonix.errors.input_error import ArgumentError
 from axonix.ui.completers.base import BaseArgCompleter
 
 
@@ -69,42 +69,52 @@ class ConfigCompleter(BaseArgCompleter):
 class ConfigCommand(BaseCommand):
     name = "config"
     help = "Manage shell configuration"
-    usage = "config [list|get|set|reload|path|edit] [key] [value]"
+    usage = "config [list|get|set|unset|reload|path|edit] [key] [value]"
     tags = ["builtin", "core"]
     examples = [
         "config list                    - Show all settings",
         "config get input.prompt        - Get prompt symbol",
-        "config set input.prompt '>'    - Change prompt symbol",
+        "config set input.prompt '>'    - Change prompt symbol (validated)",
+        "config unset input.prompt      - Remove a key (back to default)",
         "config reload                  - Reload config from file",
         "config path                    - Show config file location",
         "config edit                    - Open config in $EDITOR",
     ]
 
     def get_completer(self):
-        from axonix.config.settings import CONFIG_PATH
+        from axonix.config.settings import get_config_path
+        from axonix.config.store import read_raw
         try:
-            with open(CONFIG_PATH, "r") as f:
-                data = json.load(f)
-            return ConfigCompleter(data)
+            return ConfigCompleter(read_raw(get_config_path()))
         except Exception:
             return ConfigCompleter({})
 
-    def execute(self, args: list[str], context: ExecutionContext, stdin=None, stdout=None):
-        from axonix.config.settings import CONFIG_PATH
+    def execute(
+        self,
+        args: list[str],
+        context: ExecutionContext,
+        stdin=None,
+        stdout=None,
+        stderr=None,
+    ) -> int:
+        from axonix.config.settings import get_config_path
+        from axonix.config.store import read_raw
+
+        CONFIG_PATH = get_config_path()
 
         if not args:
             self._write(f"Usage: {self.usage}\n", stdout)
-            self._write("Subcommands: list, get, set, reload, path, edit\n", stdout)
+            self._write("Subcommands: list, get, set, unset, reload, path, edit\n", stdout)
             return 0
 
         command = args[0].lower()
 
         # Load current raw JSON
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r") as f:
-                data = json.load(f)
-        else:
-            data = {}
+        try:
+            data = read_raw(CONFIG_PATH)
+        except (ValueError, OSError) as e:
+            self._write_err(f"config: cannot read {CONFIG_PATH}: {e}\n", stderr)
+            return 1
 
         if command == "list":
             self._print_dict(data, stdout=stdout)
@@ -112,31 +122,26 @@ class ConfigCommand(BaseCommand):
 
         if command == "get":
             if len(args) < 2:
-                self._write("Usage: config get <key>\n", stdout)
-                return 0
+                raise ArgumentError(self.name, args, reason="expected KEY")
             key = args[1]
             val = self._get_value(data, key)
             if val is not None:
                 self._write(f"{val}\n", stdout)
                 return 0
-            self._write(f"Key '{key}' not found.\n", stdout)
+            self._write_err(f"config: key '{key}' not found\n", stderr)
             return 1
 
         if command == "set":
             if len(args) < 3:
-                self._write("Usage: config set <key> <value>\n", stdout)
-                return 0
+                raise ArgumentError(self.name, args, reason="expected KEY VALUE")
             key = args[1]
-            value_str = " ".join(args[2:])
-            value = self._infer_type(value_str)
-            if self._set_value(data, key, value):
-                with open(CONFIG_PATH, "w") as f:
-                    json.dump(data, f, indent=4)
-                self._write(f"✓ Set '{key}' = {repr(value)}\n", stdout)
-                self._hot_reload_setting(context, key, value, stdout)
-                return 0
-            self._write(f"✗ Failed to set '{key}'\n", stdout)
-            return 1
+            value = self._infer_type(" ".join(args[2:]))
+            return self._set(context, CONFIG_PATH, key, value, stdout, stderr)
+
+        if command == "unset":
+            if len(args) < 2:
+                raise ArgumentError(self.name, args, reason="expected KEY")
+            return self._unset(CONFIG_PATH, args[1], stdout, stderr)
 
         if command == "reload":
             return self._reload_config(context, stdout)
@@ -164,9 +169,58 @@ class ConfigCommand(BaseCommand):
             self._write("Reloading configuration...\n", stdout)
             return self._reload_config(context, stdout)
 
-        self._write(f"Unknown subcommand: {command}\n", stdout)
-        self._write(f"Usage: {self.usage}\n", stdout)
-        return 1
+        raise ArgumentError(self.name, command, reason="unknown subcommand")
+
+    def _validated(self, data: dict, stderr) -> bool:
+        """Reject a document the shell could not start with."""
+        from pydantic import ValidationError
+
+        from axonix.config.settings import AppConfig, format_validation_error
+
+        try:
+            AppConfig.model_validate(data)
+        except ValidationError as e:
+            self._write_err("config: invalid value, nothing written:\n", stderr)
+            for line in format_validation_error(e):
+                self._write_err(f"  {line}\n", stderr)
+            return False
+        return True
+
+    def _set(self, context, path: str, key: str, value: Any, stdout, stderr) -> int:
+        from axonix.config.store import read_raw, write_raw
+
+        # Validate on a copy first so an invalid value never reaches disk.
+        candidate = read_raw(path)
+        if not self._set_value(candidate, key, value):
+            self._write_err(f"config: cannot set '{key}': parent is not a section\n", stderr)
+            return 1
+        if not self._validated(candidate, stderr):
+            return 1
+        write_raw(path, candidate)
+        self._write(f"✓ Set '{key}' = {value!r}\n", stdout)
+        self._hot_reload_setting(context, key, value, stdout)
+        return 0
+
+    def _unset(self, path: str, key: str, stdout, stderr) -> int:
+        from axonix.config.store import read_raw, write_raw
+
+        candidate = read_raw(path)
+        keys = key.split(".")
+        curr = candidate
+        for k in keys[:-1]:
+            if not isinstance(curr, dict) or k not in curr:
+                self._write_err(f"config: key '{key}' not found\n", stderr)
+                return 1
+            curr = curr[k]
+        if not isinstance(curr, dict) or keys[-1] not in curr:
+            self._write_err(f"config: key '{key}' not found\n", stderr)
+            return 1
+        del curr[keys[-1]]
+        if not self._validated(candidate, stderr):
+            return 1
+        write_raw(path, candidate)
+        self._write(f"✓ Unset '{key}' (default applies after 'config reload')\n", stdout)
+        return 0
 
     def _reload_config(self, context: ExecutionContext, stdout) -> int:
         """Reload configuration from file and apply changes.
@@ -194,6 +248,10 @@ class ConfigCommand(BaseCommand):
                 shell.session.style = shell.style
 
             # Invalidate caches
+            session = getattr(shell, "session", None)
+            if session is None:
+                self._write("✓ Configuration reloaded successfully\n", stdout)
+                return 0
             if hasattr(shell.session, 'lexer') and shell.session.lexer:
                 lexer = shell.session.lexer
                 if hasattr(lexer, 'invalidate_cache'):

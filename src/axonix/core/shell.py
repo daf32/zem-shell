@@ -109,10 +109,9 @@ class Shell:
 
     def _sync_plugin_configs(self):
         """Sync default plugin configurations to the config file."""
-        import json
+        from axonix.config.settings import get_config_path
+        from axonix.config.store import update_raw
 
-        from axonix.config.settings import CONFIG_PATH
-        
         updated = False
         plugins_config = self.config.plugins.copy()
         
@@ -123,29 +122,14 @@ class Shell:
                 updated = True
         
         if updated:
-            try:
-                # We update the file directly to persist changes
-                if os.path.exists(CONFIG_PATH):
-                    with open(CONFIG_PATH, 'r') as f:
-                        data = json.load(f)
-                else:
-                    data = {}
-                
-                # Ensure plugins section exists
-                if "plugins" not in data:
-                    data["plugins"] = {}
-                
-                # Update with new defaults (only if not present)
+            def mutate(data: dict) -> None:
+                section = data.setdefault("plugins", {})
                 for k, v in plugins_config.items():
-                    if k not in data["plugins"]:
-                        data["plugins"][k] = v
-                
-                with open(CONFIG_PATH, 'w') as f:
-                    json.dump(data, f, indent=4)
-                
-                # Update in-memory config
+                    section.setdefault(k, v)
+
+            try:
+                update_raw(get_config_path(), mutate)
                 self.config.plugins = plugins_config
-                
             except Exception as e:
                 print(f"Warning: Failed to sync plugin configs: {e}")
 

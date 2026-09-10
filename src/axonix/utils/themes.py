@@ -174,24 +174,19 @@ class ThemeManager:
                 app.invalidate()
     
     def _save_theme_to_config(self, theme_name: str):
-        """Save active theme name to config file."""
-        from axonix.config.settings import CONFIG_PATH
-        
-        try:
-            if os.path.exists(CONFIG_PATH):
-                with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                    config_data = json.load(f)
-            else:
-                config_data = {}
+        """Persist the active theme name and its colours to the config file."""
+        from axonix.config.settings import get_config_path
+        from axonix.config.store import update_raw
 
-            config_data["active_theme"] = theme_name
+        theme = self.get_theme(theme_name)
 
-            theme = self.get_theme(theme_name)
+        def mutate(data: dict) -> None:
+            data["active_theme"] = theme_name
             if theme:
-                config_data["colors"] = theme.get("colors", {})
+                data["colors"] = theme.get("colors", {})
 
-            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-                json.dump(config_data, f, indent=4)
+        try:
+            update_raw(get_config_path(), mutate)
         except Exception:
             pass
     

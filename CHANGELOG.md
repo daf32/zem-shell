@@ -40,6 +40,11 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- `config unset KEY`. `config set` validates the resulting document
+  against the schema before writing, so a bad value (`input.path_depth
+  -1`, duplicate operator symbols) is rejected instead of breaking the
+  next start. All writers of `config.json` (`config set`, `theme set`,
+  plugin default sync) go through one locked, atomic read-modify-write.
 - fish-style ghost-text suggestions from history (`input.auto_suggest`,
   on by default).
 - Job control: `&` detaches the whole pipeline as a job (`[1] pid`),

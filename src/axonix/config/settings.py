@@ -70,6 +70,15 @@ class ColorScheme(BaseModel):
 class VenvScheme(BaseModel):
     auto: bool = True
 
+def format_validation_error(error) -> list[str]:
+    """``loc: msg`` lines for a pydantic ``ValidationError``."""
+    lines = []
+    for item in error.errors():
+        loc = ".".join(str(x) for x in item["loc"]) or "<root>"
+        lines.append(f"{loc}: {item['msg']}")
+    return lines
+
+
 def _legacy_config_path() -> str:
     """Path to the historical config.json that lived in the project root."""
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "config.json"))

@@ -37,12 +37,15 @@ def main():
         from prompt_toolkit import HTML, print_formatted_text
 
         # Don't construct AppConfig() here: the config is what's broken.
+        from axonix.config.settings import format_validation_error, get_config_path
+
         print_formatted_text(HTML("<ansired>[ERROR]</ansired> Configuration Error:"))
-        for error in e.errors():
-            loc = ".".join(str(x) for x in error['loc'])
+        for line in format_validation_error(e):
+            loc, _, msg = line.partition(": ")
             print_formatted_text(
-                HTML(f"  <ansiyellow>-</ansiyellow> <ansicyan>{loc}</ansicyan>: {error['msg']}")
+                HTML(f"  <ansiyellow>-</ansiyellow> <ansicyan>{loc}</ansicyan>: {msg}")
             )
+        print_formatted_text(HTML(f"  in <ansicyan>{get_config_path()}</ansicyan>"))
         sys.exit(1)
     except Exception as e:
         from prompt_toolkit import HTML, print_formatted_text
