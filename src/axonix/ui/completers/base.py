@@ -7,6 +7,11 @@ from prompt_toolkit.document import Document
 
 class BaseArgCompleter(ABC):
     """Base class for argument completers."""
+
+    #: When the completer yields nothing, the shell falls back to path
+    #: completion. Completers that already cover paths (or deliberately
+    #: restrict them, like `cd`'s directories-only) set this to False.
+    fallback_to_paths: bool = True
     
     @abstractmethod
     def get_completions(

@@ -102,6 +102,8 @@ class EnhancedPathCompleter(PathCompleter):
 
 class DirectoryCompleter(BaseArgCompleter):
     """Completes only directory paths with metadata."""
+
+    fallback_to_paths = False  # "no matching directory" must not offer files
     
     def __init__(self):
         self._completer = EnhancedPathCompleter(expanduser=True, only_directories=True)

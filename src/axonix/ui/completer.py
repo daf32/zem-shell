@@ -113,7 +113,11 @@ class AxonixCompleter(Completer):
             for completion in completer.get_completions(document, parts, word_before):
                 produced = True
                 yield completion
-            if produced or _current_word(text_before).startswith("-"):
+            if (
+                produced
+                or not getattr(completer, "fallback_to_paths", True)
+                or _current_word(text_before).startswith("-")
+            ):
                 return
             # Nothing specific to offer: fall through to paths, so e.g.
             # `git add <TAB>` still completes files.
