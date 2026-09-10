@@ -5,7 +5,7 @@ description = "A modular Python-based shell focused on extensibility and speed"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 authors = [
   { name = "Anton Litvinov" }
 ]
@@ -17,6 +17,9 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: System :: Shells",
 ]
@@ -45,7 +48,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py310"
 extend-exclude = ["dist", ".venv"]
 
 [tool.ruff.lint]
@@ -61,7 +64,7 @@ select = ["E", "F", "I", "B"]
 "scripts/build_mac_app.py" = ["E501"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.10"
 files = ["src"]
 ignore_missing_imports = true
 # Loose by default — the codebase isn't fully typed yet. There is a known

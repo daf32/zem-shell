@@ -6,6 +6,10 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Python 3.10+ is supported (was 3.13+). `pip install zem` now works on
+  any current Python; `uv tool install zem` still needs no Python at all.
+
 ## [0.9.10] - 2026-09-10
 ### Changed
 - **Renamed Axonix → Zem.** Package `zem`, command `zem`, config at
