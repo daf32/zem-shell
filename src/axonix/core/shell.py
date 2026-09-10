@@ -17,7 +17,9 @@ from axonix.builtins.registry import CommandRegistry
 from axonix.config.settings import AppConfig
 from axonix.core.context import ExecutionContext
 from axonix.core.executor import CommandExecutor
+from axonix.core.history_expand import expand_history
 from axonix.core.parser import Parser
+from axonix.core.scan import join_lines
 from axonix.errors.base_error import CLIError
 from axonix.errors.execute_error import ExecutionError
 from axonix.errors.parser_error import ParseError
@@ -163,15 +165,41 @@ class Shell:
 
     def _load_rc_file(self):
         if os.path.exists(self.rc_file):
-            try:
-                with open(self.rc_file, "r") as f:
-                    for line in f:
-                        line = line.strip()
-                        if not line or line.startswith("#"):
-                            continue
-                        self._execute_line(line, add_to_history=False)
-            except Exception as e:
-                print(f"Error loading {self.rc_file}: {e}")
+            self._run_script_file(self.rc_file)
+
+    def _run_script_lines(self, lines) -> int:
+        """Execute ``lines`` as a script (rc file, `source`).
+
+        Blank lines and `#` comment lines are skipped; a line that needs
+        continuation (trailing `\\`, open quote, trailing operator) is
+        joined with the following one. Each logical line runs through
+        `_execute_line` without touching history; execution continues past
+        errors like an interactive bash `source`. Returns the last exit code.
+        """
+        buffer: str | None = None
+        for raw in lines:
+            line = raw.rstrip("\n")
+            if buffer is None:
+                if not line.strip() or line.lstrip().startswith(self.config.operators.comment):
+                    continue
+                buffer = line
+            else:
+                buffer = join_lines(buffer, line, self.config.operators)
+            if not Parser.needs_continuation(buffer, self.config):
+                self._execute_line(buffer, add_to_history=False)
+                buffer = None
+        if buffer is not None:
+            self._execute_line(buffer, add_to_history=False)
+        return self.context.last_exit_code
+
+    def _run_script_file(self, path: str) -> int:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return self._run_script_lines(f)
+        except OSError as e:
+            self._print_error(f"{path}: {e.strerror}")
+            self.context.last_exit_code = 1
+            return 1
 
     def _clear_current_line(self):
         sys.stdout.write("\r\033[2K")
@@ -413,7 +441,11 @@ class Shell:
         # Build right prompt
         rprompt = self._get_rprompt() if self.config.input.rprompt else None
 
-        return self.session.prompt(prompt_html, rprompt=rprompt)
+        text = self.session.prompt(prompt_html, rprompt=rprompt)
+        while Parser.needs_continuation(text, self.config):
+            more = self.session.prompt([("class:prompt_symbol", "> ")])
+            text = join_lines(text, more, self.config.operators)
+        return text
 
     def _print_error(self, message: str):
         from prompt_toolkit import HTML, print_formatted_text
@@ -440,6 +472,20 @@ class Shell:
         """Execute a command line with proper resource management."""
         if not user_input.strip():
             return
+
+        if add_to_history and self.config.history.expand:
+            try:
+                user_input, changed = expand_history(
+                    user_input, self.context.history, self.config.operators
+                )
+            except CLIError as e:
+                self.context.last_exit_code = getattr(e, "exit_code", 1)
+                self._print_error(str(e))
+                return
+            if changed:
+                # bash echoes the expanded line so the user sees what ran.
+                sys.stdout.write(user_input + "\n")
+                sys.stdout.flush()
 
         if add_to_history:
             self._add_history(user_input)

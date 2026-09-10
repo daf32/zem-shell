@@ -40,6 +40,12 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- Line continuation: a trailing `\`, an open quote or `$(`, or a
+  trailing `|`/`&&`/`||` prompts for more input with `> `. Works in
+  `~/.axonixrc` too.
+- History expansion `!!`, `!$`, `!N`, `!-N`, `!prefix` (unquoted, at word
+  start; `!=` and a trailing `!` stay literal). The expanded line is
+  echoed before running. Disable with `history.expand = false`.
 - Command substitution `$(...)`, nested and quoted forms included. Output
   is word-split when unquoted and kept verbatim inside double quotes;
   `$?` is not affected by the substituted command.

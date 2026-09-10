@@ -40,6 +40,7 @@ class HistorySettings(BaseModel):
     load_on_start: bool = True
     save_on_exit: bool = True
     rotate: bool = True  # truncate to max_entries on save
+    expand: bool = True  # `!!`, `!$`, `!N`, `!prefix` history expansion
 
 class RCSettings(BaseModel):
     auto_create: bool = True

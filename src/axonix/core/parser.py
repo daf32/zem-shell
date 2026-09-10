@@ -2,6 +2,7 @@ import os
 import re
 from typing import TYPE_CHECKING, Callable, Optional
 
+from axonix.core.scan import needs_continuation, scan
 from axonix.errors.parser_error import ParseError, UnclosedQuoteError
 
 if TYPE_CHECKING:
@@ -84,44 +85,16 @@ class Parser:
         return output.rstrip("\n"), close + 1
 
     def _walk(self, text: str):
-        """Yield ``(char, escaped, state)`` for every character.
-
-        ``state`` is ``SUBST`` while inside ``$( ... )`` (any nesting depth)
-        so the pipe/logic splitters leave those characters alone; the
-        tokenizer later hands the whole substitution to the substitutor.
-        """
-        ops = self.config.operators
-        state = self.NORMAL
-        escaped = False
-        depth = 0
-        for i, ch in enumerate(text):
-            yield ch, escaped, (self.SUBST if depth else state)
-
-            if escaped:
-                escaped = False
-            elif ch == ops.escape and state != self.SINGLE:
-                escaped = True
-            elif state == self.NORMAL:
-                if ch == ops.quote:
-                    state = self.SINGLE
-                elif ch == ops.double_quote:
-                    state = self.DOUBLE
-                elif ch == ops.variable and text[i + 1:i + 2] == "(":
-                    depth += 1
-                elif ch == ")" and depth:
-                    depth -= 1
-            elif state == self.SINGLE and ch == ops.quote:
-                state = self.NORMAL
-            elif state == self.DOUBLE:
-                if ch == ops.double_quote:
-                    state = self.NORMAL
-                elif ch == ops.variable and text[i + 1:i + 2] == "(":
-                    depth += 1
-                elif ch == ")" and depth:
-                    depth -= 1
-
+        """Yield ``(char, escaped, state)``; see :func:`axonix.core.scan.scan`."""
+        chars, state, _ = scan(text, self.config.operators)
+        yield from chars
         if state != self.NORMAL:
             raise UnclosedQuoteError()
+
+    @staticmethod
+    def needs_continuation(text: str, config: "AppConfig") -> bool:
+        """True when ``text`` is an incomplete line (see :mod:`axonix.core.scan`)."""
+        return needs_continuation(text, config.operators)
 
     def _expand_aliases(self, tokens: list[str]) -> list[str]:
         if not tokens: 
