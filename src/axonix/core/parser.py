@@ -591,6 +591,18 @@ class Parser:
                     is_last = len(commands) == len(pipeline_segments) - 1
                     spec["background"] = spec["background"] and is_last
 
+                    # `command CMD ARGS` bypasses builtins (aliases were
+                    # already not expanded past the first word). `-v`/`-V`
+                    # are handled by the `command` builtin itself.
+                    spec["force_external"] = False
+                    if (
+                        final_args[0] == "command"
+                        and len(final_args) > 1
+                        and not final_args[1].startswith("-")
+                    ):
+                        final_args = final_args[1:]
+                        spec["force_external"] = True
+
                     commands.append({"name": final_args[0], "args": final_args[1:], **spec})
             
             if commands:

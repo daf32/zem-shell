@@ -43,8 +43,10 @@ class BaseCommand:
         if not cls.tags:
             cls.tags = ["builtin"]
         
-        # Auto-determine command name from filename
-        if not cls.name:
+        # Auto-determine command name from filename. `name` is looked up on
+        # the class itself (not inherited) so a subclass either declares
+        # its own name or gets one from its file.
+        if "name" not in cls.__dict__ or not cls.__dict__["name"]:
             file = inspect.getfile(cls)
             cls.name = Path(file).stem
         
@@ -67,18 +69,24 @@ class BaseCommand:
         from axonix.builtins.registry import CommandRegistry
         CommandRegistry.register(cls)
 
-    @staticmethod
-    def _is_valid_command_name(name: str) -> bool:
+    #: Names that don't fit the identifier rule but are shell conventions.
+    #: Only accepted when set explicitly on the class (never auto-derived).
+    SPECIAL_NAMES = frozenset({":", ".", "["})
+
+    @classmethod
+    def _is_valid_command_name(cls, name: str) -> bool:
         """Validate command name format.
-        
+
         Args:
             name: Command name to validate
-            
+
         Returns:
             True if name is valid, False otherwise
         """
         if not name:
             return False
+        if name in cls.SPECIAL_NAMES:
+            return True
         return bool(re.match(r'^[a-z_][a-z0-9_]*$', name.lower()))
 
     def _write(self, text: str, stdout: Optional[TextIO] = None) -> None:

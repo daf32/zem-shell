@@ -581,6 +581,8 @@ class Shell:
 
         if len(pipeline) > 1:
             for cmd_info in pipeline:
+                if cmd_info.get("force_external"):
+                    continue
                 cmd = self.commands.get(cmd_info["name"])
                 if cmd is not None and cmd.main_thread_only:
                     raise ExecutionError(f"{cmd.name}: cannot be used in a pipeline")
@@ -653,7 +655,7 @@ class Shell:
                     # stdout is the terminal there is nothing to duplicate.
                     current_stderr = track(os.dup(current_stdout))
 
-                command = self.commands.get(cmd_name)
+                command = None if cmd_info.get("force_external") else self.commands.get(cmd_name)
 
                 if command and len(pipeline) == 1:
                     # Single builtin: run inline on the main thread. Needed

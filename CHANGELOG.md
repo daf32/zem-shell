@@ -40,6 +40,9 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- New builtins: `true`, `false`, `:`, `test`/`[` (file, string, integer
+  tests, `!`, `-a`, `-o`, grouping), `type [-t]`, `command [-v|-V]`
+  (plain `command CMD` bypasses aliases and builtins), `source`/`.`.
 - Line continuation: a trailing `\`, an open quote or `$(`, or a
   trailing `|`/`&&`/`||` prompts for more input with `> `. Works in
   `~/.axonixrc` too.
