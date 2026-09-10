@@ -37,6 +37,7 @@ class ExecutionContext(BaseModel):
     # Use PrivateAttr for internal state that shouldn't be in model
     _last_exit_code: int = PrivateAttr(default=0)
     _background_processes: List = PrivateAttr(default_factory=list)
+    _dir_stack: List[str] = PrivateAttr(default_factory=list)  # pushd/popd
     _shell: Any = PrivateAttr(default=None)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

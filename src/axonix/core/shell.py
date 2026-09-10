@@ -308,7 +308,8 @@ class Shell:
         signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
 
-    def _close_shell(self):
+    def _restore_terminal(self):
+        """Put the tty back the way we found it (also used by `exec`)."""
         if not self.headless and self._orig_term_attrs is not None:
             try:
                 termios.tcsetattr(
@@ -318,6 +319,9 @@ class Shell:
                 )
             except Exception:
                 pass
+
+    def _close_shell(self):
+        self._restore_terminal()
 
         self.executor.cleanup_processes()
         self.context.running = False

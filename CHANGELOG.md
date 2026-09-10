@@ -42,7 +42,10 @@ All notable changes to Axonix are documented here. The format follows
 ### Added
 - New builtins: `true`, `false`, `:`, `test`/`[` (file, string, integer
   tests, `!`, `-a`, `-o`, grouping), `type [-t]`, `command [-v|-V]`
-  (plain `command CMD` bypasses aliases and builtins), `source`/`.`.
+  (plain `command CMD` bypasses aliases and builtins), `source`/`.`,
+  `read [-r] [-s] [-p PROMPT] [NAME...]`, `printf` (`%s %d %i %o %x %X
+  %f %e %g %c %%`, width/precision/flags, format reuse), `pushd`/`popd`/
+  `dirs [-c]`, `eval`, `exec CMD`.
 - Line continuation: a trailing `\`, an open quote or `$(`, or a
   trailing `|`/`&&`/`||` prompts for more input with `> `. Works in
   `~/.axonixrc` too.
