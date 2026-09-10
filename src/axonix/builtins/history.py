@@ -71,19 +71,9 @@ class HistoryCommand(BaseCommand):
             path_color = context._shell.config.colors.path
             cmd_color = context._shell.config.colors.command
         
-        # Check if we can use colored output (stdout is a real terminal)
-        use_colors = stdout is None or (hasattr(stdout, "isatty") and stdout.isatty())
-        
-        if use_colors:
-            from prompt_toolkit import print_formatted_text
-            from prompt_toolkit.formatted_text import FormattedText
-            
-            for idx, cmd in entries:
-                print_formatted_text(FormattedText([
-                    (path_color, f"{idx:5}  "),
-                    (cmd_color, cmd)
-                ]))
-        else:
-            # Plain text output for pipes/redirects
-            for idx, cmd in entries:
-                self._write(f"{idx:5}  {cmd}\n", stdout)
+        # `_print_colored` degrades to plain text in pipes/redirects.
+        for idx, cmd in entries:
+            self._print_colored([
+                (path_color, f"{idx:5}  "),
+                (cmd_color, cmd)
+            ], stdout)

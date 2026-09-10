@@ -6,6 +6,7 @@ from pathlib import Path
 
 VENV_NAMES = (".venv", "venv", "env")
 
+
 def find_venv(start: Path) -> Path | None:
     for directory in [start, *start.parents]:
         for name in VENV_NAMES:
@@ -14,57 +15,54 @@ def find_venv(start: Path) -> Path | None:
                 return venv
     return None
 
+
 def is_valid_venv(path: Path) -> bool:
     if not path.is_dir():
         return False
-    
+
     if os.name == "nt":  # Windows
         return (path / "Scripts" / "python.exe").exists()
     else:  # Linux / macOS
         return (path / "bin" / "python").exists()
 
-def activate_venv(context):
-    """Activate venv - changes take effect only within this shell instance."""
-    venv_path = find_venv(Path.cwd())
-    if venv_path:
-        if os.environ.get("VIRTUAL_ENV") == str(venv_path):
-            return
 
-        # Store original PATH before first activation
-        if not hasattr(context, 'original_path') or not context.original_path:
-            context.original_path = os.environ.get("PATH", "")
+def activate_venv(context, venv_path: Path | None = None) -> Path | None:
+    """Activate ``venv_path`` (or the nearest venv found from cwd).
 
-        if os.name == "nt":
-            bin_path = venv_path / "Scripts"
-        else:
-            bin_path = venv_path / "bin"
+    Returns the activated path, or ``None`` if nothing was found. Changes
+    go through the context's variable API so children see the new PATH.
+    """
+    if venv_path is None:
+        venv_path = find_venv(Path.cwd())
+    if venv_path is None:
+        return None
 
-        # Update OS environment
-        os.environ["VIRTUAL_ENV"] = str(venv_path)
-        os.environ["PATH"] = str(bin_path) + os.pathsep + context.original_path
+    if context.variables.get("VIRTUAL_ENV") == str(venv_path):
+        return venv_path
 
-        # Update Context variables (CRITICAL: otherwise shell.py will overwrite env with stale vars)
-        context.variables["VIRTUAL_ENV"] = str(venv_path)
-        context.variables["PATH"] = os.environ["PATH"]
+    # Remember the pre-venv PATH so deactivate can restore it.
+    if not context.original_path:
+        context.original_path = context.variables.get("PATH", "")
 
-        context.active_venv = str(venv_path)
+    bin_path = venv_path / ("Scripts" if os.name == "nt" else "bin")
 
-def deactivate_venv(context):
-    """Deactivate venv - changes take effect only within this shell instance."""
-    # Remove VIRTUAL_ENV variable
-    if "VIRTUAL_ENV" in os.environ:
-        del os.environ["VIRTUAL_ENV"]
-    
-    # Also remove from context variables
-    if "VIRTUAL_ENV" in context.variables:
-        del context.variables["VIRTUAL_ENV"]
-    
-    # Restore original PATH if it was saved
-    if hasattr(context, 'original_path') and context.original_path:
-        os.environ["PATH"] = context.original_path
-        context.variables["PATH"] = context.original_path
-    
+    context.set_var("VIRTUAL_ENV", str(venv_path), export=True)
+    context.set_var("PATH", str(bin_path) + os.pathsep + context.original_path, export=True)
+    context.active_venv = str(venv_path)
+    return venv_path
+
+
+def deactivate_venv(context) -> bool:
+    """Deactivate the current venv. Returns ``False`` if none was active."""
+    if "VIRTUAL_ENV" not in context.variables:
+        return False
+
+    context.unset_var("VIRTUAL_ENV")
+    if context.original_path:
+        context.set_var("PATH", context.original_path, export=True)
     context.active_venv = None
+    return True
+
 
 def get_venv_info() -> str | None:
     """
@@ -73,9 +71,9 @@ def get_venv_info() -> str | None:
     venv_path = os.environ.get("VIRTUAL_ENV")
     if not venv_path:
         return None
-    
+
     venv_prompt = os.environ.get("VIRTUAL_ENV_PROMPT")
     if venv_prompt:
         return venv_prompt.strip("() ")
-    
+
     return Path(venv_path).name

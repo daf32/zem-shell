@@ -32,15 +32,12 @@ def main():
     try:
         from axonix.core.shell import Shell
         shell = Shell()
-        shell.run()
+        sys.exit(shell.run())
     except ValidationError as e:
         from prompt_toolkit import HTML, print_formatted_text
 
-        from axonix.config.settings import AppConfig
-        from axonix.utils.colors import error_tag
-        
-        config = AppConfig()
-        print_formatted_text(HTML(f"{error_tag(config)} Configuration Error:"))
+        # Don't construct AppConfig() here: the config is what's broken.
+        print_formatted_text(HTML("<ansired>[ERROR]</ansired> Configuration Error:"))
         for error in e.errors():
             loc = ".".join(str(x) for x in error['loc'])
             print_formatted_text(
@@ -50,11 +47,7 @@ def main():
     except Exception as e:
         from prompt_toolkit import HTML, print_formatted_text
 
-        from axonix.config.settings import AppConfig
-        from axonix.utils.colors import error_tag
-        
-        config = AppConfig()
-        print_formatted_text(HTML(f"{error_tag(config)} Failed to start shell: {e}"))
+        print_formatted_text(HTML(f"<ansired>[ERROR]</ansired> Failed to start shell: {e}"))
         sys.exit(1)
 
 if __name__ == "__main__":

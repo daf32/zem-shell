@@ -20,8 +20,6 @@ class HelpCommand(BaseCommand):
 
     def print_commands(self, commands, context, stdout):
         """Print list of all available commands grouped by tag."""
-        from prompt_toolkit import print_formatted_text
-        from prompt_toolkit.formatted_text import FormattedText
         
         # Get colors from config
         colors = None
@@ -49,37 +47,37 @@ class HelpCommand(BaseCommand):
 
         for tag in sorted(tags):
             if colors:
-                print_formatted_text(FormattedText([
+                self._print_colored([
                     (colors.info, f"\n[{tag}]")
-                ]))
+                ], stdout)
             else:
                 self._write(f"\n[{tag}]\n", stdout)
             
             for cmd in sorted(tags[tag], key=lambda c: c.name):
                 desc = cmd.help or "No description"
                 if colors:
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (colors.command, f"  {cmd.name:<{max_cmd_name_length}}"),
                         ("", f" - {desc}")
-                    ]))
+                    ], stdout)
                 else:
                     self._write(f"  {cmd.name:<{max_cmd_name_length}} - {desc}\n", stdout)
 
         if without_tags:
             if colors:
-                print_formatted_text(FormattedText([
+                self._print_colored([
                     (colors.info, "\n[other]")
-                ]))
+                ], stdout)
             else:
                 self._write("\n[other]\n", stdout)
             
             for cmd in sorted(without_tags, key=lambda c: c.name):
                 desc = cmd.help or "No description"
                 if colors:
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (colors.command, f"  {cmd.name:<{max_cmd_name_length}}"),
                         ("", f" - {desc}")
-                    ]))
+                    ], stdout)
                 else:
                     self._write(f"  {cmd.name:<{max_cmd_name_length}} - {desc}\n", stdout)
 

@@ -1,4 +1,3 @@
-import os
 from typing import TYPE_CHECKING
 
 from axonix.builtins.base import BaseCommand
@@ -17,8 +16,9 @@ class ExportCommand(BaseCommand):
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
         if not args:
-            self._write("\n".join(f"{k}={v}" for k, v in os.environ.items()) + "\n", stdout)
-            return
+            env = context.child_env()
+            self._write("".join(f"{k}={env[k]}\n" for k in sorted(env)), stdout)
+            return 0
 
         for arg in args:
             if "=" not in arg:
@@ -27,8 +27,5 @@ class ExportCommand(BaseCommand):
                 )
 
             name, value = arg.split("=", 1)
-            context.variables[name] = value
-            os.environ[name] = value
-            # Sync to context (though it's already updated above)
-            # This ensures consistency
-            context.sync_to_environment()
+            context.set_var(name, value, export=True)
+        return 0

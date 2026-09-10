@@ -42,10 +42,8 @@ class CdCommand(BaseCommand):
         
         try:
             os.chdir(target)
-            # Update OLDPWD after successful change
-            context.variables["OLDPWD"] = old_pwd
-            # Update PWD
-            context.variables["PWD"] = os.getcwd()
+            context.set_var("OLDPWD", old_pwd, export=True)
+            context.set_var("PWD", os.getcwd(), export=True)
         except FileNotFoundError:
             raise ArgumentError(self.name, [target], reason="no such file or directory") from None
         except NotADirectoryError:

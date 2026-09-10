@@ -73,20 +73,18 @@ class WeatherCommand(BaseCommand):
             
             icon = self._get_weather_icon(code)
             
-            from prompt_toolkit import print_formatted_text
-            from prompt_toolkit.formatted_text import FormattedText
             
             # Use shell colors
             c = getattr(context._shell.config.colors, "info", "#ffffff")
             val_c = getattr(context._shell.config.colors, "variable", "#ffffff")
             
-            print_formatted_text(FormattedText([
+            self._print_colored([
                 ("", "\n"),
                 (c, f"{icon}  Weather in {display_name}:\n"),
                 ("", "   Temperature: "), (val_c, f"{temp}°C\n"),
                 ("", "   Wind Speed:  "), (val_c, f"{wind} km/h\n"),
                 ("", "\n")
-            ]))
+            ], stdout)
             
         except Exception as e:
             self._write(f"❌ Error: {e}\n", stdout)

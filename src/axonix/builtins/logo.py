@@ -15,8 +15,6 @@ class LogoCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
-        from prompt_toolkit import print_formatted_text
-        from prompt_toolkit.formatted_text import FormattedText
         
         # Get colors from shell config if available
         c = None
@@ -36,20 +34,20 @@ class LogoCommand(BaseCommand):
             ("    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝", c.logo_primary),
         ]
         
-        print_formatted_text(FormattedText([("", "")]))  # Empty line
+        self._print_colored([("", "")], stdout)  # Empty line
         for text, color in lines:
-            print_formatted_text(FormattedText([(color, text)]))
+            self._print_colored([(color, text)], stdout)
         
         # Show version if requested or just show tagline
         if args and args[0] in ("--version", "-v"):
-            print_formatted_text(FormattedText([
+            self._print_colored([
                 ("", "\n"),
                 (c.info, f"    Axonix Shell v{__version__}"),
                 ("", "\n"),
-            ]))
+            ], stdout)
         else:
-            print_formatted_text(FormattedText([
+            self._print_colored([
                 ("", "\n"),
                 (c.comment, "    A modern shell for developers"),
                 ("", "\n"),
-            ]))
+            ], stdout)

@@ -13,11 +13,12 @@ class SetCommand(BaseCommand):
 
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
-    ) -> None:
+    ) -> int:
         self._require_args(args, min_count=1, error_msg="expected NAME and VALUE")
         
         name = args[0]
         self._validate_identifier(name)
         
         value = " ".join(args[1:]) if len(args) > 1 else ""
-        context.variables[name] = value
+        context.set_var(name, value)
+        return 0

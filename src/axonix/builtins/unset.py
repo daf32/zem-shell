@@ -16,4 +16,5 @@ class UnsetCommand(BaseCommand):
     ):
         self._require_args(args, min_count=1, error_msg="expected NAME")
         name = args[0]
-        context.variables.pop(name, None)
+        context.unset_var(name)
+        return 0

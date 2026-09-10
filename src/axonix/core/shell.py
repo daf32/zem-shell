@@ -20,6 +20,7 @@ from axonix.core.context import ExecutionContext
 from axonix.core.executor import CommandExecutor
 from axonix.core.parser import Parser
 from axonix.errors.base_error import CLIError
+from axonix.errors.execute_error import ExecutionError
 from axonix.ui.completer import AxonixCompleter
 from axonix.ui.lexer import AxonixLexer
 from axonix.utils.git import format_git_branch, get_git_info
@@ -290,7 +291,6 @@ class Shell:
                 pass
 
         self.executor.cleanup_processes()
-        self.context.sync_to_environment()
         self.context.running = False
         if not self.headless:
             print("Closing shell...")
@@ -443,9 +443,6 @@ class Shell:
         if add_to_history:
             self._add_history(user_input)
 
-        # Sync environment variables before execution
-        self.context.sync_from_environment()
-
         try:
             units = Parser(
                 user_input,
@@ -470,9 +467,6 @@ class Shell:
                     break
                 # Semicolon (;) continues regardless of exit code
 
-            # Sync variables back to environment after execution
-            self.context.sync_to_environment()
-
         except CLIError as e:
             self.context.last_exit_code = getattr(e, "exit_code", 1)
             self._print_error(str(e))
@@ -495,6 +489,12 @@ class Shell:
         # external process; backgrounding a pure-builtin pipeline doesn't make
         # sense (builtins run in this process and would still mutate context).
         is_background = bool(pipeline and pipeline[-1].get("background"))
+
+        if len(pipeline) > 1:
+            for cmd_info in pipeline:
+                cmd = self.commands.get(cmd_info["name"])
+                if cmd is not None and cmd.main_thread_only:
+                    raise ExecutionError(f"{cmd.name}: cannot be used in a pipeline")
 
         def safe_close(fd):
             if fd is not None:
@@ -538,6 +538,18 @@ class Shell:
                     current_stdout = fd_out
 
                 command = self.commands.get(cmd_name)
+
+                if command and len(pipeline) == 1:
+                    # Single builtin: run inline on the main thread. Needed
+                    # for `main_thread_only` commands and avoids a thread
+                    # round-trip for the common `cd`/`set`/... case.
+                    exit_code = self.executor.run_builtin_inline(
+                        command, args, current_stdin, current_stdout
+                    )
+                    safe_close(current_stdout)
+                    safe_close(current_stdin)
+                    self.context.last_exit_code = exit_code
+                    return exit_code
 
                 if command:
                     thread = self.executor.execute_builtin(
@@ -631,7 +643,8 @@ class Shell:
             if prev_pipe_read is not None:
                 safe_close(prev_pipe_read)
 
-    def run(self):
+    def run(self) -> int:
+        """Run the interactive loop; returns the shell's exit status."""
         try:
             while self.context.running:
                 try:
@@ -647,7 +660,7 @@ class Shell:
                         continue
 
                     except EOFError:
-                        return
+                        return self.context.exit_status
 
                     # Measure command execution time
                     start_time = time.perf_counter()
@@ -666,4 +679,5 @@ class Shell:
             # SIGTERM, leaving the user's terminal in a half-broken state
             # after Ctrl-D (no echo of typed control chars).
             self._close_shell()
+        return self.context.exit_status
 

@@ -46,70 +46,119 @@ class CommandExecutor:
         self._active_processes: list[Union[subprocess.Popen, threading.Thread]] = []
         self.logger = logging.getLogger("axonix.executor")
 
+    @staticmethod
+    def _dup(fd: Optional[int]) -> Optional[int]:
+        return os.dup(fd) if fd is not None else None
+
+    def _run_builtin(
+        self,
+        command: BaseCommand,
+        args: list[str],
+        stdin_fd: Optional[int],
+        stdout_fd: Optional[int],
+        stderr_fd: Optional[int] = None,
+    ) -> int:
+        """Run ``command`` synchronously and return its exit code.
+
+        Takes ownership of the given fds (they are closed on return). Any
+        ``None`` stream falls back to the process-level ``sys.*`` stream.
+        """
+        stdin_obj: Optional[TextIO] = sys.stdin
+        stdout_obj: Optional[TextIO] = sys.stdout
+        stderr_obj: Optional[TextIO] = sys.stderr
+
+        exit_code = 0
+        try:
+            with managed_fd(stdin_fd, "r") as stdin_file, \
+                    managed_fd(stdout_fd, "w") as stdout_file, \
+                    managed_fd(stderr_fd, "w") as stderr_file:
+                if stdin_file is not None:
+                    stdin_obj = cast(TextIO, stdin_file)
+                if stdout_file is not None:
+                    stdout_obj = cast(TextIO, stdout_file)
+                if stderr_file is not None:
+                    stderr_obj = cast(TextIO, stderr_file)
+
+                kwargs = {"stdin": stdin_obj, "stdout": stdout_obj}
+                if command._accepts_stderr:
+                    kwargs["stderr"] = stderr_obj
+
+                try:
+                    ret = command.execute(args, self.context, **kwargs)
+                    # Backward compat: legacy builtins return None.
+                    exit_code = int(ret) if ret is not None else 0
+                except BrokenPipeError:
+                    # Expected in pipelines when the consumer stops reading.
+                    exit_code = 0
+                except KeyboardInterrupt:
+                    exit_code = 130
+                except CLIError as e:
+                    exit_code = getattr(e, "exit_code", 1)
+                    stderr_obj.write(f"{e}\n")
+                except Exception as e:
+                    exit_code = 1
+                    self.logger.error(f"Error in {command.name}: {e}")
+                    stderr_obj.write(f"Error in {command.name}: {e}\n")
+                finally:
+                    try:
+                        stdout_obj.flush()
+                        stderr_obj.flush()
+                    except (OSError, ValueError):
+                        pass
+        except OSError as e:
+            exit_code = 1
+            self.logger.error(f"IO error in {command.name}: {e}")
+            sys.stderr.write(f"IO error in {command.name}: {e}\n")
+        return exit_code
+
+    def run_builtin_inline(
+        self,
+        command: BaseCommand,
+        args: list[str],
+        stdin_fd: Optional[int] = None,
+        stdout_fd: Optional[int] = None,
+        stderr_fd: Optional[int] = None,
+    ) -> int:
+        """Run a builtin on the calling (main) thread.
+
+        Used for single-stage pipelines and for ``main_thread_only``
+        commands. The caller keeps ownership of its fds; duplicates are
+        handed to the builtin.
+        """
+        return self._run_builtin(
+            command, args, self._dup(stdin_fd), self._dup(stdout_fd), self._dup(stderr_fd)
+        )
+
     def execute_builtin(
         self,
         command: BaseCommand,
         args: list[str],
         stdin_fd: Optional[int] = None,
         stdout_fd: Optional[int] = None,
+        stderr_fd: Optional[int] = None,
     ) -> threading.Thread:
-        """Execute a builtin in a worker thread.
+        """Execute a builtin in a worker thread (pipeline stages).
 
         The builtin's exit code is stashed on the returned ``Thread`` as a
         ``.exit_code`` attribute; the caller (``Shell._execute_pipeline``)
         reads it after ``join()`` and writes it to ``context.last_exit_code``
         from the main thread. This keeps the shared exit-code slot free of
         cross-thread races when multiple builtins run in the same pipeline.
+
+        The worker takes ownership of *duplicates* of the caller's fds: the
+        caller closes its own copies right after this call returns, so both
+        sides can't race on the same descriptor.
         """
+        in_fd, out_fd, err_fd = self._dup(stdin_fd), self._dup(stdout_fd), self._dup(stderr_fd)
 
         def run_command():
-            stdin_obj: Optional[TextIO] = sys.stdin
-            stdout_obj: Optional[TextIO] = sys.stdout
-
-            exit_code = 0
             try:
-                with managed_fd(stdin_fd, "r") as stdin_file:
-                    if stdin_file is not None:
-                        stdin_obj = cast(TextIO, stdin_file)
-
-                    with managed_fd(stdout_fd, "w") as stdout_file:
-                        if stdout_file is not None:
-                            stdout_obj = cast(TextIO, stdout_file)
-
-                        try:
-                            ret = command.execute(
-                                args, self.context, stdin=stdin_obj, stdout=stdout_obj
-                            )
-                            # Backward compat: legacy builtins return None.
-                            exit_code = int(ret) if ret is not None else 0
-                        except BrokenPipeError:
-                            # Broken pipe is expected in pipelines when consumer stops reading
-                            exit_code = 0
-                        except CLIError as e:
-                            exit_code = getattr(e, "exit_code", 1)
-                            if stdout_obj:
-                                stdout_obj.write(f"{e}\n")
-                            else:
-                                sys.stderr.write(f"{e}\n")
-                        except Exception as e:
-                            exit_code = 1
-                            self.logger.error(f"Error in {command.name}: {e}")
-                            sys.stderr.write(f"Error in {command.name}: {e}\n")
-            except OSError as e:
-                exit_code = 1
-                self.logger.error(f"IO error in {command.name}: {e}")
-                sys.stderr.write(f"IO error in {command.name}: {e}\n")
-            finally:
-                # Stash on the thread object — read by the main thread post-join.
-                thread.exit_code = exit_code  # type: ignore[attr-defined]
-
-        # The worker takes ownership of *duplicates* of the caller's fds:
-        # `managed_fd` closes them via `fdopen(...).close()`, while the caller
-        # (`Shell._execute_pipeline`) closes its own copies right after this
-        # call returns. Without the dup both sides would close the same fd
-        # and race — whoever lost had its output silently dropped.
-        stdin_fd = os.dup(stdin_fd) if stdin_fd is not None else None
-        stdout_fd = os.dup(stdout_fd) if stdout_fd is not None else None
+                thread.exit_code = self._run_builtin(  # type: ignore[attr-defined]
+                    command, args, in_fd, out_fd, err_fd
+                )
+            except BaseException:
+                thread.exit_code = 1  # type: ignore[attr-defined]
+                raise
 
         # Use daemon=True so threads don't prevent shell shutdown.
         # Threads are explicitly joined in _execute_pipeline, so this is safe.
@@ -118,7 +167,7 @@ class CommandExecutor:
         self._active_processes.append(thread)
         thread.start()
         return thread
-    
+
     def execute_external(
         self,
         cmd_name: str,
@@ -126,6 +175,7 @@ class CommandExecutor:
         stdin_fd: Optional[int] = None,
         stdout_fd: Optional[int] = None,
         pgid: Optional[int] = None,
+        stderr_fd: Optional[int] = None,
     ) -> subprocess.Popen:
         if not cmd_name or not isinstance(cmd_name, str):
             raise ValueError(f"Invalid command name: {cmd_name}")
@@ -148,11 +198,8 @@ class CommandExecutor:
             # Shell ignores Ctrl+C while command runs
             signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-            # `os.environ` already reflects PATH updates done via `export`/`set`
-            # builtins (the shell syncs them in `context.sync_to_environment`),
-            # so just inherit it without spawning a sub-shell to re-source rc
-            # files on every command.
-            env = os.environ.copy()
+            # Children see exported variables only (see ExecutionContext).
+            env = self.context.child_env()
 
             def preexec():
                 # Create or join process group
@@ -169,6 +216,7 @@ class CommandExecutor:
                     [cmd_name] + sanitized_args,
                     stdin=stdin_fd,
                     stdout=stdout_fd,
+                    stderr=stderr_fd,
                     env=env,
                     preexec_fn=preexec,
                 )

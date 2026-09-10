@@ -191,3 +191,138 @@ def test_unknown_external_command_sets_error_exit_code(make_headless_shell, buil
     shell._execute_line("nope-cmd-xyz-not-real")
     # UnknownCommandError → exit_code 2
     assert shell.context.last_exit_code == 2
+
+
+# --------------------------------------------------------------------------
+# P1: inline path, stderr routing, main_thread_only, exit status
+# --------------------------------------------------------------------------
+
+class _RaisesArg(BaseCommand):
+    name = "traisesarg"
+
+    def execute(self, args, context, stdin=None, stdout=None):
+        from axonix.errors.input_error import ArgumentError
+        raise ArgumentError("traisesarg", args, "bad")
+
+
+class _WritesErr(BaseCommand):
+    """Declares `stderr=`; the executor must pass a stream for it."""
+    name = "twriteserr"
+
+    def execute(self, args, context, stdin=None, stdout=None, stderr=None):
+        self._write("out\n", stdout)
+        self._write_err("err\n", stderr)
+        return 0
+
+
+class _MainOnly(BaseCommand):
+    name = "tmainonly"
+    main_thread_only = True
+
+    def execute(self, args, context, stdin=None, stdout=None):
+        import threading
+        self._write(f"{threading.current_thread() is threading.main_thread()}\n", stdout)
+        return 0
+
+
+class _Colored(BaseCommand):
+    name = "tcolored"
+
+    def execute(self, args, context, stdin=None, stdout=None):
+        self._print_colored([("#ff0000", "red"), ("", " plain")], stdout)
+        return 0
+
+
+@pytest.fixture
+def p1_builtins(builtins_for_pipeline):
+    return {
+        **builtins_for_pipeline,
+        "traisesarg": _RaisesArg(),
+        "twriteserr": _WritesErr(),
+        "tmainonly": _MainOnly(),
+        "tcolored": _Colored(),
+    }
+
+
+def test_cli_error_text_goes_to_stderr_not_pipe(tmp_path, make_headless_shell, p1_builtins, capfd):
+    out = tmp_path / "out.txt"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"traisesarg x | tcat > {out}")
+    assert out.read_text() == ""            # nothing leaked downstream
+    assert "Invalid argument" in capfd.readouterr().err
+
+
+def test_inline_builtin_gets_exit_code_and_stderr(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("traisesarg x")
+    assert shell.context.last_exit_code == 2
+    assert "Invalid argument" in capfd.readouterr().err
+
+
+def test_stderr_kwarg_passed_only_when_declared(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("twriteserr")
+    captured = capfd.readouterr()
+    assert captured.out == "out\n"
+    assert captured.err == "err\n"
+
+
+def test_inline_and_threaded_paths_agree_on_exit_code(make_headless_shell, p1_builtins):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("tfail")
+    inline = shell.context.last_exit_code
+    shell._execute_line("techo x | tfail")
+    threaded = shell.context.last_exit_code
+    assert inline == threaded == 7
+
+
+def test_single_builtin_runs_on_main_thread(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("tmainonly")
+    assert capfd.readouterr().out == "True\n"
+
+
+def test_main_thread_only_rejected_in_pipeline(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("techo a | tmainonly")
+    assert shell.context.last_exit_code == 3  # ExecutionError
+    assert "cannot be used in a pipeline" in capfd.readouterr().err
+
+
+def test_print_colored_is_plain_in_redirect(tmp_path, make_headless_shell, p1_builtins):
+    out = tmp_path / "out.txt"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"tcolored > {out}")
+    assert out.read_text() == "red plain\n"
+
+
+def test_external_child_sees_exported_vars_only(tmp_path, make_headless_shell, p1_builtins):
+    out = tmp_path / "env.txt"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell.context.set_var("AX_LOCAL", "1")
+    shell.context.set_var("AX_EXP", "2", export=True)
+    shell._execute_line(f"/usr/bin/env > {out}")
+    env = out.read_text()
+    assert "AX_EXP=2" in env
+    assert "AX_LOCAL=" not in env
+    assert "?=" not in env
+
+
+def test_exit_sets_status_and_stops(full_shell, run):
+    code, out, err = run(full_shell, "exit 3")
+    assert full_shell.context.running is False
+    assert full_shell.context.exit_status == 3
+    assert out == ""  # no "Closing shell..." chatter
+
+
+def test_exit_without_arg_uses_last_exit_code(full_shell, run):
+    full_shell.context.last_exit_code = 5
+    run(full_shell, "exit")
+    assert full_shell.context.exit_status == 5
+
+
+def test_exit_non_numeric_is_usage_error(full_shell, run):
+    code, out, err = run(full_shell, "exit abc")
+    assert code == 2
+    assert full_shell.context.running is True
+    assert "numeric argument required" in err

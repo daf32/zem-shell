@@ -4,14 +4,18 @@
 
 | Method | Purpose | Example |
 |--------|---------|---------|
-| `_write(text, stdout)` | Safely write to stdout | `self._write("Result\n", stdout)` |
+| `_write(text, stdout)` | Write to stdout | `self._write("Result\n", stdout)` |
+| `_write_err(text, stderr)` | Write to stderr | `self._write_err("oops\n", stderr)` |
 | `_input(stdin)` | Read single line from stdin | `line = self._input(stdin)` |
 | `_read_stdin_all(stdin)` | Read all stdin content | `content = self._read_stdin_all(stdin)` |
 | `_require_args(args, min_count)` | Validate argument count | `self._require_args(args, 2)` |
 | `_get_arg(args, index, default)` | Safe argument access | `name = self._get_arg(args, 0, "default")` |
 | `_validate_identifier(name)` | Check valid Python identifier | `self._validate_identifier(var_name)` |
 | `_colorize(text, color)` | Create colored tuple | `self._colorize("✓", "#50fa7b")` |
-| `_print_colored(items, stdout)` | Print colored output | `self._print_colored([(color, text)])` |
+| `_print_colored(items, stdout)` | Print colored output (plain in pipes) | `self._print_colored([(color, text)], stdout)` |
+
+`execute` should return an `int` exit code (`0` on success). See
+`COMMAND_DEVELOPMENT.md` → "Exit Codes and Streams".
 
 ## 🎯 Common Patterns
 

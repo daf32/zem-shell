@@ -24,8 +24,6 @@ class ThemeCommand(BaseCommand):
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
     ):
-        from prompt_toolkit import print_formatted_text
-        from prompt_toolkit.formatted_text import FormattedText
 
         from axonix.config.settings import AppConfig
         from axonix.utils.themes import ThemeManager
@@ -60,26 +58,26 @@ class ThemeCommand(BaseCommand):
                 
                 if is_valid:
                     color = config.colors.info
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (color, f"  {display_name}"),
                         ("", f" ({theme_type}) - by {author}")
-                    ]))
+                    ], stdout)
                 else:
                     # Show invalid themes with warning
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (config.colors.warning, f"  {display_name}"),
                         (config.colors.error, " ⚠ invalid"),
                         ("", f" ({theme_type}) - by {author}")
-                    ]))
+                    ], stdout)
             
             # Show validation errors if any
             if validation_errors:
                 self._write("\n⚠ Theme validation issues:\n", stdout)
                 for theme_name, errors in validation_errors.items():
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (config.colors.warning, f"  {theme_name}: "),
                         (config.colors.error, "; ".join(errors))
-                    ]))
+                    ], stdout)
             
             self._write("\n", stdout)
         
@@ -93,16 +91,16 @@ class ThemeCommand(BaseCommand):
             if shell:
                 success = manager.apply_theme(theme_name, shell)
                 if success:
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (config.colors.exit_code_ok, "✓ "),
                         ("", f"Theme '{theme_name}' applied successfully!")
-                    ]))
+                    ], stdout)
                     self._write("\n", stdout)
                 else:
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (config.colors.error, "✗ "),
                         ("", f"Theme '{theme_name}' not found")
-                    ]))
+                    ], stdout)
                     self._write("\n", stdout)
             else:
                 self._write("Error: Cannot apply theme (shell reference not found)\n", stdout)
@@ -123,14 +121,14 @@ class ThemeCommand(BaseCommand):
                 if theme:
                     colors = theme.get("colors", {})
                     self._write("Sample:\n", stdout)
-                    print_formatted_text(FormattedText([
+                    self._print_colored([
                         (colors.get("command", "#ffffff"), "command "),
                         (colors.get("operator", "#ffffff"), "| "),
                         (colors.get("variable", "#ffffff"), "$variable "),
                         (colors.get("string", "#ffffff"), '"string"'),
                         ("", " "),
                         (colors.get("comment", "#ffffff"), "# comment"),
-                    ]))
+                    ], stdout)
                     self._write("\n\n", stdout)
             else:
                 self._write(f"Theme '{theme_name}' not found\n", stdout)
@@ -176,16 +174,16 @@ class ThemeCommand(BaseCommand):
             name = manager.install_theme(url)
             
             if name:
-                print_formatted_text(FormattedText([
+                self._print_colored([
                     (config.colors.exit_code_ok, "✓ "),
                     ("", f"Theme '{name}' installed successfully!")
-                ]))
+                ], stdout)
                 self._write(f"\nUse 'theme set {name}' to apply it\n", stdout)
             else:
-                print_formatted_text(FormattedText([
+                self._print_colored([
                     (config.colors.error, "✗ "),
                     ("", "Failed to install theme")
-                ]))
+                ], stdout)
                 self._write("\nMake sure the URL points to a valid JSON theme file\n", stdout)
         
         elif subcommand == "variants":
@@ -202,10 +200,10 @@ class ThemeCommand(BaseCommand):
                     theme = manager.get_theme(v)
                     if theme:
                         theme_type = theme.get("type", "dark")
-                        print_formatted_text(FormattedText([
+                        self._print_colored([
                             (config.colors.info, f"  {v}"),
                             ("", f" ({theme_type})")
-                        ]))
+                        ], stdout)
                 self._write("\n", stdout)
             else:
                 self._write(f"No variants found for '{base_name}'\n", stdout)

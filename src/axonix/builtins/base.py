@@ -29,6 +29,12 @@ class BaseCommand:
     usage: str = ""
     tags: list[str] = []
     examples: list[str] = []
+    #: Commands that must run on the shell's main thread (they nest
+    #: `_execute_line`, touch the terminal, or replace the process).
+    #: Such a command may not appear in a multi-stage pipeline.
+    main_thread_only: bool = False
+    #: Computed in `__init_subclass__`: whether `execute` accepts `stderr=`.
+    _accepts_stderr: bool = False
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -49,6 +55,14 @@ class BaseCommand:
                 "alphanumeric characters and underscores, and not start with a digit"
             )
         
+        # Third-party plugins written against the old 4-argument `execute`
+        # keep working: the executor only passes `stderr=` when accepted.
+        try:
+            params = inspect.signature(cls.execute).parameters
+            cls._accepts_stderr = "stderr" in params
+        except (TypeError, ValueError):
+            cls._accepts_stderr = False
+
         # Auto-register command
         from axonix.builtins.registry import CommandRegistry
         CommandRegistry.register(cls)
@@ -68,14 +82,22 @@ class BaseCommand:
         return bool(re.match(r'^[a-z_][a-z0-9_]*$', name.lower()))
 
     def _write(self, text: str, stdout: Optional[TextIO] = None) -> None:
-        """Write text to stdout if available.
-        
+        """Write text to stdout.
+
         Args:
             text: Text to write
             stdout: Output stream (default: sys.stdout)
         """
-        if stdout:
-            stdout.write(text)
+        (stdout or sys.stdout).write(text)
+
+    def _write_err(self, text: str, stderr: Optional[TextIO] = None) -> None:
+        """Write text to stderr.
+
+        Args:
+            text: Text to write
+            stderr: Error stream (default: sys.stderr)
+        """
+        (stderr or sys.stderr).write(text)
 
     def _input(self, stdin: Optional[TextIO] = None) -> str:
         """Read a line from stdin.
@@ -177,16 +199,20 @@ class BaseCommand:
         items: list[tuple],
         stdout: Optional[TextIO] = None
     ) -> None:
-        """Print colored formatted text.
-        
+        """Print colored formatted text, followed by a newline.
+
+        Colors are only emitted when ``stdout`` is a terminal; in pipes,
+        redirects and tests prompt_toolkit falls back to plain text, so
+        callers never need a separate "plain" branch.
+
         Args:
-            items: List of (color, text) tuples
-            stdout: Output stream
+            items: List of (style, text) tuples
+            stdout: Output stream (default: sys.stdout)
         """
         from prompt_toolkit import print_formatted_text
         from prompt_toolkit.formatted_text import FormattedText
-        
-        print_formatted_text(FormattedText(items))
+
+        print_formatted_text(FormattedText(items), file=stdout or sys.stdout)
     
     def _validate_identifier(
         self,
@@ -218,6 +244,7 @@ class BaseCommand:
         context: "ExecutionContext",
         stdin: Optional[TextIO] = None,
         stdout: Optional[TextIO] = None,
+        stderr: Optional[TextIO] = None,
     ) -> Optional[int]:
         """Execute the command.
 
@@ -226,16 +253,21 @@ class BaseCommand:
             context: Shell execution context (variables, history, commands, etc.)
             stdin: Input stream
             stdout: Output stream
+            stderr: Error stream (only passed if your signature declares it)
 
         Returns:
             Exit code (``int``). Returning ``None`` is treated as ``0`` for
             backward compatibility with older builtins / plugins, but new
-            commands should return an explicit ``int`` — writing to
-            ``context.last_exit_code`` from inside ``execute`` is unsafe in
-            pipelines (the builtin runs in a worker thread, and the shared
-            attribute is shared with sibling stages). Raise a ``CLIError``
-            subclass for user-facing errors instead; the executor maps its
-            ``exit_code`` automatically.
+            commands should return an explicit ``int``. Conventions:
+
+            * usage error -> raise ``ArgumentError`` (exit 2)
+            * runtime failure -> write a message via ``_write_err`` and
+              ``return 1``
+
+            Never write ``context.last_exit_code`` from inside ``execute``:
+            in pipelines the builtin runs in a worker thread and the
+            attribute is shared with sibling stages. Raising a ``CLIError``
+            subclass is always safe; the executor maps its ``exit_code``.
 
         Raises:
             NotImplementedError: Must be implemented in subclasses

@@ -14,6 +14,7 @@ from typing import Callable, Optional
 
 import pytest
 
+from axonix.builtins import load_plugins
 from axonix.builtins.registry import CommandRegistry
 from axonix.config.settings import AppConfig
 from axonix.core.shell import Shell
@@ -109,6 +110,18 @@ def _isolate_axonix_config(tmp_path, monkeypatch):
     import axonix.config.settings as s
     monkeypatch.setattr(s, "CONFIG_PATH", str(cfg))
     yield
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _load_real_builtins_once():
+    """Import the shipped builtins/plugins exactly once per session.
+
+    Registration happens at import time, and Python won't re-import a
+    module, so the registry must be populated *before* the per-test
+    snapshot below is taken — otherwise the first restore would wipe the
+    real builtins for good.
+    """
+    load_plugins(user_plugins_dir=None)
 
 
 @pytest.fixture(autouse=True)
