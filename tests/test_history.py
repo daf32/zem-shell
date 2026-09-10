@@ -2,11 +2,11 @@ from axonix.core.shell import Shell
 from axonix.config.settings import AppConfig
 
 
-def make_shell_with_history_limit(limit: int = 3):
+def _shell_with_history_limit(tmp_path, limit: int) -> Shell:
     cfg = AppConfig(
         history={
             "enable": True,
-            "file": "/tmp/axonix_history_test",
+            "file": str(tmp_path / "axonix_history_test"),
             "max_entries": limit,
             "load_on_start": False,
             "save_on_exit": False,
@@ -14,14 +14,15 @@ def make_shell_with_history_limit(limit: int = 3):
         },
         rc={
             "auto_create": False,
-            "file": "/tmp/axonixrc_test",
+            "file": str(tmp_path / "axonixrc_test"),
         },
+        venv={"auto": False},
     )
-    return Shell(config=cfg)
+    return Shell(commands={}, config=cfg, headless=True)
 
 
-def test_history_trimmed_to_limit():
-    shell = make_shell_with_history_limit(limit=2)
+def test_history_trimmed_to_limit(tmp_path):
+    shell = _shell_with_history_limit(tmp_path, limit=2)
     shell._add_history("one")
     shell._add_history("two")
     shell._add_history("three")
