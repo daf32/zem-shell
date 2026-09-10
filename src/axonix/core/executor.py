@@ -103,6 +103,14 @@ class CommandExecutor:
                 # Stash on the thread object — read by the main thread post-join.
                 thread.exit_code = exit_code  # type: ignore[attr-defined]
 
+        # The worker takes ownership of *duplicates* of the caller's fds:
+        # `managed_fd` closes them via `fdopen(...).close()`, while the caller
+        # (`Shell._execute_pipeline`) closes its own copies right after this
+        # call returns. Without the dup both sides would close the same fd
+        # and race — whoever lost had its output silently dropped.
+        stdin_fd = os.dup(stdin_fd) if stdin_fd is not None else None
+        stdout_fd = os.dup(stdout_fd) if stdout_fd is not None else None
+
         # Use daemon=True so threads don't prevent shell shutdown.
         # Threads are explicitly joined in _execute_pipeline, so this is safe.
         thread = threading.Thread(target=run_command, daemon=True)

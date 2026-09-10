@@ -35,14 +35,26 @@ class Shell:
     RC_FILE = os.path.expanduser("~/.axonixrc")
     
     def __init__(
-        self, 
+        self,
         commands: Optional[Dict[str, BaseCommand]] = None,
-        config: Optional[AppConfig] = None
+        config: Optional[AppConfig] = None,
+        headless: bool = False,
     ):
+        """Construct a shell instance.
+
+        ``headless=True`` skips everything that requires a real TTY:
+        ``prompt_toolkit`` session setup, signal handlers, and the
+        ``termios``/``tcsetpgrp`` plumbing. Use it from tests, where
+        ``sys.stdin`` is a captured pseudo-file with no ``fileno()``.
+        Pipelines built from ``Parser`` plus ``Executor`` still work in
+        headless mode — only the interactive REPL path (``Shell.run``)
+        is unavailable.
+        """
         self.config = config or AppConfig()
         self.context = ExecutionContext()
         self.history_file = self.config.history.file
         self.rc_file = self.config.rc.file
+        self.headless = headless
 
         if commands is None:
             load_plugins()
@@ -52,13 +64,15 @@ class Shell:
 
         self.context.commands = self.commands
         self.executor = CommandExecutor(self.context)
-        
+
         self.context._shell = self
         self._last_command_duration: Optional[float] = None  # Duration in seconds
-        self._setup_prompt_session()
-        self._setup_signal_handlers()
         self._interrupted = False
-        
+
+        if not headless:
+            self._setup_prompt_session()
+            self._setup_signal_handlers()
+
         if self.config.rc.auto_create and not os.path.exists(self.rc_file):
             self._create_default_rc()
 
@@ -66,8 +80,16 @@ class Shell:
 
         if self.config.venv.auto:
             activate_venv(self.context)
-            
+
         self._sync_plugin_configs()
+
+        if headless:
+            # Sentinel values; nothing reads them except `_close_shell`,
+            # which guards on `headless` too.
+            self._shell_pgid = -1
+            self._tty_fd = -1
+            self._orig_term_attrs = None
+            return
 
         self._shell_pgid = os.getpgrp()
         self._tty_fd = sys.stdin.fileno()
@@ -255,19 +277,21 @@ class Shell:
 
 
     def _close_shell(self):
-        try:
-            termios.tcsetattr(
-                self._tty_fd,
-                termios.TCSANOW,
-                self._orig_term_attrs
-            )
-        except Exception:
-            pass
+        if not self.headless and self._orig_term_attrs is not None:
+            try:
+                termios.tcsetattr(
+                    self._tty_fd,
+                    termios.TCSANOW,
+                    self._orig_term_attrs
+                )
+            except Exception:
+                pass
 
         self.executor.cleanup_processes()
         self.context.sync_to_environment()
         self.context.running = False
-        print("Closing shell...")
+        if not self.headless:
+            print("Closing shell...")
 
     def _format_path(self, current_dir: str) -> str:
         """Format current directory for display."""
