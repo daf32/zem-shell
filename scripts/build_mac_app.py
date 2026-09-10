@@ -7,7 +7,7 @@ from pathlib import Path
 def create_mac_app():
     project_root = Path(__file__).parent.parent.resolve()
     dist_dir = project_root / "dist"
-    app_name = "Axonix.app"
+    app_name = "Zem.app"
     app_path = dist_dir / app_name
     
     print(f"🏗  Building {app_name} in {dist_dir}...")
@@ -32,15 +32,15 @@ def create_mac_app():
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>Axonix</string>
+    <string>Zem</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.axonix.shell</string>
+    <string>com.zem.shell</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Axonix</string>
+    <string>Zem</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -62,11 +62,11 @@ def create_mac_app():
     launcher_content = f"""#!/bin/bash
 PROJECT_DIR="{project_root}"
 
-osascript -e 'tell application "Terminal" to do script "cd \\"'$PROJECT_DIR'\\" && clear && uv run ax"'
+osascript -e 'tell application "Terminal" to do script "cd \\"'$PROJECT_DIR'\\" && clear && uv run zem"'
 osascript -e 'tell application "Terminal" to activate'
 """
 
-    executable_path = macos_dir / "Axonix"
+    executable_path = macos_dir / "Zem"
     with open(executable_path, "w") as f:
         f.write(launcher_content)
 

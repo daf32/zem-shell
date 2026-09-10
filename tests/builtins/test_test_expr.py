@@ -2,7 +2,7 @@
 
 import pytest
 
-from axonix.builtins._test_expr import ExprSyntaxError, evaluate
+from zem.builtins._test_expr import ExprSyntaxError, evaluate
 
 
 @pytest.fixture

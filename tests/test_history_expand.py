@@ -2,8 +2,8 @@
 
 import pytest
 
-from axonix.config.settings import AppConfig
-from axonix.core.history_expand import HistoryExpansionError, expand_history
+from zem.config.settings import AppConfig
+from zem.core.history_expand import HistoryExpansionError, expand_history
 
 OPS = AppConfig().operators
 HIST = ["echo one", "git status", "ls -la /tmp"]

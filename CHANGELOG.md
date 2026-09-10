@@ -1,18 +1,23 @@
 # Changelog
 
-All notable changes to Axonix are documented here. The format follows
+All notable changes to Zem are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
 ### Changed
+- **Renamed Axonix → Zem.** Package `zem`, command `zem`, config at
+  `~/.config/zem/config.json`, rc file `~/.zemrc`, history
+  `~/.zem_history`, plugins/themes under `~/.zem/`, env vars
+  `ZEM_CONFIG_PATH` / `ZEM_LOG_ENABLED` / `ZEM_LOG_LEVEL`. Existing
+  Axonix files are moved to the new locations on first start.
 - **Variable model.** `set NAME` now creates a shell-local variable; only
   exported variables (inherited from the environment, or promoted with
   `export`) reach child processes. Previously every `set` variable and
   even `?` leaked into children, and `unset` of an inherited variable was
   silently undone on the next line. Reassigning an inherited name such as
-  `PATH` keeps it exported, so existing `~/.axonixrc` files work unchanged.
+  `PATH` keeps it exported, so existing `~/.zemrc` files work unchanged.
 - A single builtin on a line runs on the main thread; pipeline stages
   still run in worker threads. Commands marked `main_thread_only` are
   rejected in pipelines with a clear error.
@@ -61,7 +66,7 @@ All notable changes to Axonix are documented here. The format follows
   `dirs [-c]`, `eval`, `exec CMD`.
 - Line continuation: a trailing `\`, an open quote or `$(`, or a
   trailing `|`/`&&`/`||` prompts for more input with `> `. Works in
-  `~/.axonixrc` too.
+  `~/.zemrc` too.
 - History expansion `!!`, `!$`, `!N`, `!-N`, `!prefix` (unquoted, at word
   start; `!=` and a trailing `!` stay literal). The expanded line is
   echoed before running. Disable with `history.expand = false`.
@@ -74,8 +79,8 @@ All notable changes to Axonix are documented here. The format follows
   silently ignored.
 - `BaseCommand.execute` may declare `stderr=`; `_write_err()` helper.
 - `ExecutionContext.set_var/unset_var/export_var/unexport_var/child_env`.
-- `ax --version` / `ax -V` prints the installed version.
-- `axonix.__version__`, read from package metadata (single source of truth is
+- `zem --version` / `zem -V` prints the installed version.
+- `zem.__version__`, read from package metadata (single source of truth is
   `pyproject.toml`).
 - GitHub Actions CI: ruff, mypy (non-blocking baseline), pytest on Linux and
   macOS.
@@ -107,7 +112,7 @@ All notable changes to Axonix are documented here. The format follows
 - Pipeline fds were closed twice in some error paths, which could close
   an unrelated descriptor that had reused the number.
 - `AppConfig` read the config path once at class definition, so changing
-  `AXONIX_CONFIG_PATH` after import (or in tests) was ignored.
+  `ZEM_CONFIG_PATH` after import (or in tests) was ignored.
 - Coloured builtins wrote CRLF line endings when redirected to a file.
 - `echo a\'b` printed `ab`: the tokenizer dropped the backslash but kept
   the quote, which the quote-removal pass then treated as an opener.

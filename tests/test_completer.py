@@ -1,4 +1,4 @@
-"""AxonixCompleter: dispatch, fallback, quote-aware segments, isolation."""
+"""ZemCompleter: dispatch, fallback, quote-aware segments, isolation."""
 
 import os
 import stat
@@ -7,7 +7,7 @@ import pytest
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 
-from axonix.ui.completer import AxonixCompleter
+from zem.ui.completer import ZemCompleter
 
 
 def _complete(completer, text):
@@ -17,7 +17,7 @@ def _complete(completer, text):
 
 @pytest.fixture
 def completer(full_shell):
-    return AxonixCompleter(full_shell)
+    return ZemCompleter(full_shell)
 
 
 def test_command_position_lists_builtins_with_meta(completer):
@@ -68,27 +68,27 @@ def test_separators_and_logic_operators(completer):
 
 
 def test_command_completer_registries_are_per_shell(full_shell, make_headless_shell):
-    a = AxonixCompleter(full_shell)
-    b = AxonixCompleter(make_headless_shell(commands=None))
+    a = ZemCompleter(full_shell)
+    b = ZemCompleter(make_headless_shell(commands=None))
     a.registry.register("zzz", a.registry.get("git"))
     assert b.registry.get("zzz") is None
 
 
 def test_builtin_completer_overrides_default(completer):
     # `cd` provides its own DirectoryCompleter via get_completer().
-    from axonix.ui.completers.defaults import DirectoryCompleter
+    from zem.ui.completers.defaults import DirectoryCompleter
     assert isinstance(completer.registry.get("cd"), DirectoryCompleter)
     assert completer.registry.get("yarn") is None  # npm flags were wrong for yarn
 
 
 def test_system_commands_follow_path(tmp_path, monkeypatch, completer):
-    exe = tmp_path / "axonix-test-binary"
+    exe = tmp_path / "zem-test-binary"
     exe.write_text("#!/bin/sh\n")
     exe.chmod(exe.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("PATH", str(tmp_path))
-    assert "axonix-test-binary" in _complete(completer, "axonix-test")
+    assert "zem-test-binary" in _complete(completer, "zem-test")
     monkeypatch.setenv("PATH", os.devnull)
-    assert "axonix-test-binary" not in _complete(completer, "axonix-test")
+    assert "zem-test-binary" not in _complete(completer, "zem-test")
 
 
 def test_path_completion_for_arguments(tmp_path, monkeypatch, completer):

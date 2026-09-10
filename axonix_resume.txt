@@ -1,0 +1,18 @@
+Axonix Shell
+Technologies: Python 3.13, prompt-toolkit, Pydantic BaseSettings,
+subprocess, threading, pytest, ruff, mypy, uv
+
+An interactive command shell (REPL) built with a three-layer
+architecture. The parser builds an AST supporting variable
+substitution and glob expansion. The executor runs built-in commands
+in daemon threads and launches external processes via subprocess.Popen
+with full POSIX pipeline and I/O redirection support. Terminal state
+is managed through termios and os.tcsetpgrp.
+
+Configuration is powered by Pydantic BaseSettings with a JSON file as
+the primary config source. The UI layer is built on prompt-toolkit and
+includes a custom syntax-highlighting lexer, context-aware
+autocompletion, and fuzzy history search.
+
+Code quality: test coverage with pytest, linting with ruff, static
+type checking with mypy, dependency management with uv.

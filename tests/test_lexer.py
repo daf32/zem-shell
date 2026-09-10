@@ -1,11 +1,11 @@
-"""AxonixLexer: command validity follows PATH; path cache can be cleared."""
+"""ZemLexer: command validity follows PATH; path cache can be cleared."""
 
 import stat
 
 import pytest
 from prompt_toolkit.document import Document
 
-from axonix.ui.lexer import AxonixLexer
+from zem.ui.lexer import ZemLexer
 
 
 def _tokens(lexer, text):
@@ -18,7 +18,7 @@ def _style_of(lexer, text, word):
 
 @pytest.fixture
 def lexer(full_shell):
-    return AxonixLexer(full_shell)
+    return ZemLexer(full_shell)
 
 
 def test_builtin_alias_and_unknown(lexer, full_shell):

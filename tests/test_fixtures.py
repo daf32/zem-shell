@@ -1,7 +1,7 @@
 """Smoke tests for the shared fixtures in conftest.py."""
 
-from axonix.builtins.base import BaseCommand
-from axonix.builtins.registry import CommandRegistry
+from zem.builtins.base import BaseCommand
+from zem.builtins.registry import CommandRegistry
 
 
 def test_full_shell_has_real_builtins_only(full_shell):

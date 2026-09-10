@@ -1,15 +1,15 @@
-# Axonix
+# Zem
 
 ```text
-     █████╗ ██╗  ██╗ ██████╗ ███╗   ██╗██╗██╗  ██╗
-    ██╔══██╗╚██╗██╔╝██╔═══██╗████╗  ██║██║╚██╗██╔╝
-    ███████║ ╚███╔╝ ██║   ██║██╔██╗ ██║██║ ╚███╔╝ 
-    ██╔══██║ ██╔██╗ ██║   ██║██║╚██╗██║██║ ██╔██╗ 
-    ██║  ██║██╔╝ ██╗╚██████╔╝██║ ╚████║██║██╔╝ ██╗
-    ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝
+    ███████╗███████╗███╗   ███╗
+    ╚══███╔╝██╔════╝████╗ ████║
+      ███╔╝ █████╗  ██╔████╔██║
+     ███╔╝  ██╔══╝  ██║╚██╔╝██║
+    ███████╗███████╗██║ ╚═╝ ██║
+    ╚══════╝╚══════╝╚═╝     ╚═╝
 ```
 
-Axonix is a modular Python-based shell focused on extensibility and speed.
+Zem is a modular Python-based shell focused on extensibility and speed.
 
 ## 🌟 Key Features
 
@@ -37,7 +37,7 @@ Axonix is a modular Python-based shell focused on extensibility and speed.
   search, themes (`theme list`), git/venv/exit-code/duration in the prompt.
 
 - **Configuration**: one validated JSON file (`config set` refuses values the shell
-  could not start with), `~/.axonixrc`, plugins in `~/.axonix/plugins/`.
+  could not start with), `~/.zemrc`, plugins in `~/.zem/plugins/`.
 
 ## 🚀 Installation
 
@@ -46,8 +46,8 @@ This project uses `uv` for dependency management.
 1. **Clone the repository**:
 
     ```bash
-    git clone https://github.com/daf32/axonix-shell.git
-    cd axonix-shell
+    git clone https://github.com/daf32/zem-shell.git
+    cd zem-shell
     ```
 
 2. **Install dependencies**:
@@ -56,54 +56,54 @@ This project uses `uv` for dependency management.
     uv sync
     ```
 
-3. **Optional — install `ax` globally as a uv tool**:
+3. **Optional — install `zem` globally as a uv tool**:
 
     ```bash
-    ./scripts/install_axonix.sh
+    ./scripts/install_zem.sh
     ```
 
 ## 💻 Usage
 
-Run the shell from the checkout (or just `ax` after the global install):
+Run the shell from the checkout (or just `zem` after the global install):
 
 ```bash
-uv run ax
+uv run zem
 ```
 
-`ax --version` prints the installed version.
+`zem --version` prints the installed version.
 
 ### Example Session
 
 ```bash
 # Variables: shell-local vs exported
-~ axonix # set name Antigravity
-~ axonix # echo "Hello, $name!"
+~ zem # set name Antigravity
+~ zem # echo "Hello, $name!"
 Hello, Antigravity!
-~ axonix # export EDITOR=vim
+~ zem # export EDITOR=vim
 
 # Substitution, tests, redirections
-~ axonix # echo "today is $(date +%A)"
-~ axonix # [ -d .git ] && echo "in a repo" || echo "not a repo"
-~ axonix # make 2> build.log
+~ zem # echo "today is $(date +%A)"
+~ zem # [ -d .git ] && echo "in a repo" || echo "not a repo"
+~ zem # make 2> build.log
 
 # Pipelines with builtins
-~ axonix # help | grep -i theme
+~ zem # help | grep -i theme
 
 # Jobs
-~ axonix # sleep 30 &
+~ zem # sleep 30 &
 [1] 4242
-~ axonix # jobs
+~ zem # jobs
 [1]+ Running                 sleep 30
-~ axonix # kill %1
+~ zem # kill %1
 ```
 
 ## 🛠 Project Structure
 
 ```text
-axonix-shell/
+zem-shell/
 ├── pyproject.toml      # Dependency management
 └── src/
-    └── axonix/         # Core package
+    └── zem/            # Core package
         ├── main.py     # Entry point
         ├── core/       # Shell engine: REPL, parser, executor, jobs, context
         ├── builtins/   # Standard command implementations
@@ -114,8 +114,8 @@ axonix-shell/
         └── errors/     # Custom exception hierarchy
 ```
 
-The user-level configuration lives at `~/.config/axonix/config.json`
-(or `$XDG_CONFIG_HOME/axonix/config.json`). Override with `AXONIX_CONFIG_PATH`.
+The user-level configuration lives at `~/.config/zem/config.json`
+(or `$XDG_CONFIG_HOME/zem/config.json`). Override with `ZEM_CONFIG_PATH`.
 
 ## ⚙️ Configuration (`config.json`)
 
@@ -148,11 +148,11 @@ shows every key):
 
 The shell uses an automated discovery system for commands. To add a new builtin:
 
-1. Create a file in `src/axonix/builtins/` (e.g., `hello.py`).
+1. Create a file in `src/zem/builtins/` (e.g., `hello.py`).
 2. Inherit from `BaseCommand` and implement `execute`.
 
 ```python
-from axonix.builtins.base import BaseCommand
+from zem.builtins.base import BaseCommand
 
 class HelloCommand(BaseCommand):
     name = "hello"
@@ -165,6 +165,6 @@ class HelloCommand(BaseCommand):
 
 The shell will automatically detect and register your command on the next launch.
 See `docs/COMMAND_DEVELOPMENT.md` for the full API (exit codes, streams, variables,
-completion, plugin config). User plugins go in `~/.axonix/plugins/`.
+completion, plugin config). User plugins go in `~/.zem/plugins/`.
 
 Run the tests with `uv run pytest`; lint with `uv run ruff check .`.

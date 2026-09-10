@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pytest
 
-from axonix.builtins.base import BaseCommand
-from axonix.core.context import ExecutionContext
-from axonix.core.executor import CommandExecutor
-from axonix.errors.input_error import UnknownCommandError
+from zem.builtins.base import BaseCommand
+from zem.core.context import ExecutionContext
+from zem.core.executor import CommandExecutor
+from zem.errors.input_error import UnknownCommandError
 
 # --------------------------------------------------------------------------
 # Tiny test builtins. They live here so they don't get auto-registered
@@ -96,7 +96,7 @@ def test_builtin_returning_none_maps_to_zero():
 
 def test_builtin_cli_error_maps_to_exit_code():
     """Raising a CLIError surfaces its exit_code via thread.exit_code."""
-    from axonix.errors.input_error import ArgumentError
+    from zem.errors.input_error import ArgumentError
 
     class _Raises(BaseCommand):
         name = "traises"
@@ -201,7 +201,7 @@ class _RaisesArg(BaseCommand):
     name = "traisesarg"
 
     def execute(self, args, context, stdin=None, stdout=None):
-        from axonix.errors.input_error import ArgumentError
+        from zem.errors.input_error import ArgumentError
         raise ArgumentError("traisesarg", args, "bad")
 
 

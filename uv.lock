@@ -16,7 +16,7 @@ wheels = [
 ]
 
 [[package]]
-name = "axonix"
+name = "zem"
 version = "0.9.9a0"
 source = { editable = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-"""Tests for config-file bootstrap in axonix.config.settings."""
+"""Tests for config-file bootstrap in zem.config.settings."""
 
 import json
 import subprocess
@@ -7,11 +7,11 @@ import threading
 
 import pytest
 
-from axonix.config.store import read_raw, update_raw, write_raw
+from zem.config.store import read_raw, update_raw, write_raw
 
 
 def test_first_run_creates_valid_config(tmp_path):
-    """Importing settings with a missing AXONIX_CONFIG_PATH must create a
+    """Importing settings with a missing ZEM_CONFIG_PATH must create a
     valid JSON file instead of crashing on the half-written empty file.
 
     Runs in a subprocess because `_ensure_config_file` fires at import time
@@ -19,12 +19,12 @@ def test_first_run_creates_valid_config(tmp_path):
     """
     cfg = tmp_path / "nested" / "config.json"
     code = (
-        "from axonix.config.settings import AppConfig; "
+        "from zem.config.settings import AppConfig; "
         "print(AppConfig().active_theme)"
     )
     result = subprocess.run(
         [sys.executable, "-c", code],
-        env={"AXONIX_CONFIG_PATH": str(cfg), "PATH": "/usr/bin:/bin"},
+        env={"ZEM_CONFIG_PATH": str(cfg), "PATH": "/usr/bin:/bin"},
         capture_output=True,
         text=True,
     )
@@ -70,7 +70,7 @@ def test_update_raw_is_atomic_under_contention(tmp_path):
 
 def test_config_set_validates_before_writing(full_shell, run, monkeypatch, tmp_path):
     path = tmp_path / "cfg.json"
-    monkeypatch.setenv("AXONIX_CONFIG_PATH", str(path))
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
     write_raw(str(path), {"input": {"path_depth": 2}})
     code, out, err = run(full_shell, "config set input.path_depth -1")
     assert code == 1 and out == ""
@@ -80,7 +80,7 @@ def test_config_set_validates_before_writing(full_shell, run, monkeypatch, tmp_p
 
 def test_config_set_get_unset(full_shell, run, monkeypatch, tmp_path):
     path = tmp_path / "cfg.json"
-    monkeypatch.setenv("AXONIX_CONFIG_PATH", str(path))
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
     assert run(full_shell, "config set input.path_depth 3")[0] == 0
     assert read_raw(str(path))["input"]["path_depth"] == 3
     assert run(full_shell, "config get input.path_depth")[1] == "3\n"
@@ -95,7 +95,7 @@ def test_config_set_get_unset(full_shell, run, monkeypatch, tmp_path):
 
 def test_config_set_rejects_unknown_operator_conflict(full_shell, run, monkeypatch, tmp_path):
     path = tmp_path / "cfg.json"
-    monkeypatch.setenv("AXONIX_CONFIG_PATH", str(path))
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
     # Making `pipe` the same symbol as `semicolon` is rejected by
     # validate_unique_operators; the shell must not persist it.
     code, _, err = run(full_shell, "config set operators.pipe ';'")
@@ -105,7 +105,7 @@ def test_config_set_rejects_unknown_operator_conflict(full_shell, run, monkeypat
 
 def test_theme_and_plugin_sync_keep_each_others_keys(full_shell, run, monkeypatch, tmp_path):
     path = tmp_path / "cfg.json"
-    monkeypatch.setenv("AXONIX_CONFIG_PATH", str(path))
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
     write_raw(str(path), {"plugins": {"weather": {"default_city": "Oslo"}}})
     run(full_shell, "theme set nord")
     data = read_raw(str(path))
@@ -119,7 +119,7 @@ def test_theme_and_plugin_sync_keep_each_others_keys(full_shell, run, monkeypatc
 def test_format_validation_error():
     from pydantic import ValidationError
 
-    from axonix.config.settings import AppConfig, format_validation_error
+    from zem.config.settings import AppConfig, format_validation_error
 
     with pytest.raises(ValidationError) as info:
         AppConfig.model_validate({"input": {"path_depth": -1}})

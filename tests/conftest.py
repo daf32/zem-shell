@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for axonix tests.
+"""Shared pytest fixtures for zem tests.
 
 The shell normally requires a real TTY (it touches `termios`, installs
 signal handlers, and constructs a `prompt_toolkit` `PromptSession`).
@@ -14,10 +14,10 @@ from typing import Callable, Optional
 
 import pytest
 
-from axonix.builtins import load_plugins
-from axonix.builtins.registry import CommandRegistry
-from axonix.config.settings import AppConfig
-from axonix.core.shell import Shell
+from zem.builtins import load_plugins
+from zem.builtins.registry import CommandRegistry
+from zem.config.settings import AppConfig
+from zem.core.shell import Shell
 
 
 def _isolated_config(tmp_path) -> AppConfig:
@@ -25,7 +25,7 @@ def _isolated_config(tmp_path) -> AppConfig:
     return AppConfig(
         history={
             "enable": True,
-            "file": str(tmp_path / "axonix_history"),
+            "file": str(tmp_path / "zem_history"),
             "max_entries": 1000,
             "load_on_start": False,
             "save_on_exit": False,
@@ -33,7 +33,7 @@ def _isolated_config(tmp_path) -> AppConfig:
         },
         rc={
             "auto_create": False,
-            "file": str(tmp_path / "axonixrc"),
+            "file": str(tmp_path / "zemrc"),
         },
         venv={"auto": False},
     )
@@ -100,14 +100,14 @@ def run(capfd) -> Callable[[Shell, str], tuple[int, str, str]]:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_axonix_config(tmp_path, monkeypatch):
-    """Point AXONIX_CONFIG_PATH at a per-test file so suite runs don't
-    mutate the real `~/.config/axonix/config.json`."""
-    cfg = tmp_path / "axonix-config.json"
-    monkeypatch.setenv("AXONIX_CONFIG_PATH", str(cfg))
+def _isolate_zem_config(tmp_path, monkeypatch):
+    """Point ZEM_CONFIG_PATH at a per-test file so suite runs don't
+    mutate the real `~/.config/zem/config.json`."""
+    cfg = tmp_path / "zem-config.json"
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(cfg))
     # `settings.CONFIG_PATH` is computed at import time; override the
     # module attribute too in case anything has already imported it.
-    import axonix.config.settings as s
+    import zem.config.settings as s
     monkeypatch.setattr(s, "CONFIG_PATH", str(cfg))
     yield
 
@@ -135,9 +135,9 @@ def _isolate_command_registry():
     classes = dict(CommandRegistry._command_classes)
     instances = dict(CommandRegistry._commands)
     # Test modules define throwaway builtins at import (collection) time,
-    # before this fixture ever runs; hide anything not shipped by axonix.
+    # before this fixture ever runs; hide anything not shipped by zem.
     for name, cls in classes.items():
-        if not cls.__module__.startswith("axonix."):
+        if not cls.__module__.startswith("zem."):
             CommandRegistry._command_classes.pop(name, None)
             CommandRegistry._commands.pop(name, None)
     yield

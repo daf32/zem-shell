@@ -1,8 +1,8 @@
 import pytest
 
-from axonix.config.settings import AppConfig
-from axonix.core.parser import Parser
-from axonix.errors.parser_error import ParseError
+from zem.config.settings import AppConfig
+from zem.core.parser import Parser
+from zem.errors.parser_error import ParseError
 
 
 def test_pipe_requires_command():

@@ -1,6 +1,6 @@
 # Command Development Guide
 
-This guide explains how to develop builtin commands for Axonix shell using the enhanced `BaseCommand` class.
+This guide explains how to develop builtin commands for Zem shell using the enhanced `BaseCommand` class.
 
 ## BaseCommand Helper Methods
 
@@ -140,12 +140,12 @@ Much cleaner! 🎉
 Here's a template for a new builtin command:
 
 ```python
-from axonix.builtins.base import BaseCommand
-from axonix.errors.input_error import ArgumentError
+from zem.builtins.base import BaseCommand
+from zem.errors.input_error import ArgumentError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from axonix.core.context import ExecutionContext
+    from zem.core.context import ExecutionContext
 
 
 class MyCommand(BaseCommand):
@@ -236,14 +236,14 @@ with a clear error instead of misbehaving.
 ## Completion and Plugin Config
 
 * Override `get_completer()` to return a `BaseArgCompleter` for argument
-  completion (see `src/axonix/ui/completers/base.py`).
+  completion (see `src/zem/ui/completers/base.py`).
 * Override `get_default_config()` to ship defaults; the shell writes them
   into `config.json` under `plugins.<name>` on first start. Read them back
   with `self.get_plugin_config(context)`.
 
 ## External Plugins
 
-Drop a `.py` file into `~/.axonix/plugins/`. It is imported after the
+Drop a `.py` file into `~/.zem/plugins/`. It is imported after the
 bundled commands and may reuse a builtin's name to override it.
 
 ## Auto-Registration

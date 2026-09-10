@@ -76,8 +76,8 @@ def test_exec_replaces_process(tmp_path):
     code = f"""
 import sys
 sys.path.insert(0, {str(tmp_path)!r})
-from axonix.config.settings import AppConfig
-from axonix.core.shell import Shell
+from zem.config.settings import AppConfig
+from zem.core.shell import Shell
 cfg = AppConfig(history={{"file": {str(tmp_path / "h")!r}, "load_on_start": False,
                           "save_on_exit": False}},
                 rc={{"auto_create": False, "file": {str(tmp_path / "rc")!r}}},
@@ -86,6 +86,6 @@ sh = Shell(config=cfg, headless=True, user_plugins_dir=None)
 sh._execute_line("exec /bin/echo replaced")
 print("NOT REACHED")
 """
-    env = {**os.environ, "AXONIX_CONFIG_PATH": str(tmp_path / "cfg.json")}
+    env = {**os.environ, "ZEM_CONFIG_PATH": str(tmp_path / "cfg.json")}
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
     assert result.stdout == "replaced\n", result.stderr

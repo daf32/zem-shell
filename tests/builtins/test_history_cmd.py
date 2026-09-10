@@ -2,7 +2,7 @@
 
 import pytest
 
-from axonix.ui.history import AxonixFileHistory
+from zem.ui.history import ZemFileHistory
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def test_history_strict_args(shell, run):
 
 def test_file_history_clear_truncates_and_resets(tmp_path):
     path = tmp_path / "hist"
-    h = AxonixFileHistory(str(path))
+    h = ZemFileHistory(str(path))
     h.append_string("one")
     h.append_string("two")
     assert list(h.load_history_strings()) == ["two", "one"]

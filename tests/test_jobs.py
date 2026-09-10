@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from axonix.core.jobs import JobState, JobTable, format_notice, wait_process
+from zem.core.jobs import JobState, JobTable, format_notice, wait_process
 
 
 def _settle(table: JobTable, predicate, timeout=3.0):

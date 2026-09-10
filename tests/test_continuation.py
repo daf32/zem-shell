@@ -2,9 +2,9 @@
 
 import pytest
 
-from axonix.config.settings import AppConfig
-from axonix.core.parser import Parser
-from axonix.core.scan import join_lines
+from zem.config.settings import AppConfig
+from zem.core.parser import Parser
+from zem.core.scan import join_lines
 
 OPS = AppConfig().operators
 
@@ -77,7 +77,7 @@ def test_run_script_file_missing(full_shell, capfd):
 
 
 def test_rc_file_supports_continuation(tmp_path, make_headless_shell, isolated_config, capfd):
-    rc = tmp_path / "axonixrc"
+    rc = tmp_path / "zemrc"
     rc.write_text("echo one \\\n  two\nalias hi='echo hi'\nhi\n")
     isolated_config.rc.file = str(rc)
     shell = make_headless_shell(commands=None, config=isolated_config)

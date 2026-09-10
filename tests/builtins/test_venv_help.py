@@ -49,6 +49,6 @@ def test_help_unknown_and_alias(full_shell, run):
 
 
 def test_logo_returns_zero(full_shell, run):
-    from axonix import __version__
+    from zem import __version__
     assert run(full_shell, "logo")[0] == 0
     assert __version__ in run(full_shell, "logo --version")[1]
