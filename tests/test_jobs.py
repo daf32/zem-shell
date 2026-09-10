@@ -169,17 +169,27 @@ def test_fg_with_no_jobs(shell, run):
 
 
 def test_foreground_stop_registers_job(shell, run):
-    """A foreground job that gets stopped lands in the table with 128+TSTP."""
+    """A foreground job that gets stopped lands in the table with 128+TSTP.
+
+    The stop is delivered *before* `_wait_job` runs: waitpid(WUNTRACED)
+    reports a pending stop, so no timer thread races the process-group
+    setup (a race that produced EPERM from killpg on macOS runners).
+    """
     import subprocess
-    import threading
     proc = subprocess.Popen(["/bin/sleep", "5"], preexec_fn=os.setpgrp)
-    threading.Timer(0.2, lambda: os.killpg(proc.pid, signal.SIGSTOP)).start()
-    job = shell.context._jobs.add(proc.pid, "/bin/sleep 5", [proc])
-    code = shell._wait_job(job, foreground=True)
-    assert code == 128 + signal.SIGSTOP
-    assert job.state is JobState.STOPPED and job in list(shell.context._jobs)
-    os.killpg(proc.pid, signal.SIGKILL)
-    os.killpg(proc.pid, signal.SIGCONT)
+    try:
+        proc.send_signal(signal.SIGSTOP)
+        job = shell.context._jobs.add(proc.pid, "/bin/sleep 5", [proc])
+        code = shell._wait_job(job, foreground=True)
+        assert code == 128 + signal.SIGSTOP
+        assert job.state is JobState.STOPPED and job in list(shell.context._jobs)
+    finally:
+        for sig in (signal.SIGKILL, signal.SIGCONT):
+            try:
+                proc.send_signal(sig)
+            except OSError:
+                pass
+        proc.wait()
 
 
 # -- disown / exit -------------------------------------------------------------
