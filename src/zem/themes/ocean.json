@@ -1,0 +1,22 @@
+{
+    "name": "Ocean",
+    "author": "Zem Team",
+    "type": "dark",
+    "colors": {
+        "command": "#6699cc",
+        "variable": "#99cc99",
+        "operator": "#cc99cc",
+        "comment": "#65737e",
+        "string": "#99cc99",
+        "path": "#5fb3b3",
+        "prompt_symbol": "#d8dee9",
+        "exit_code_ok": "#99cc99",
+        "exit_code_err": "#ec5f67",
+        "error": "#ec5f67",
+        "warning": "#f99157",
+        "info": "#5fb3b3",
+        "logo_primary": "#5fb3b3",
+        "logo_secondary": "#6699cc",
+        "logo_tertiary": "#65737e"
+    }
+}

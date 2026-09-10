@@ -1,12 +1,13 @@
 import os
-import stat
 import shutil
+import stat
 from pathlib import Path
+
 
 def create_mac_app():
     project_root = Path(__file__).parent.parent.resolve()
     dist_dir = project_root / "dist"
-    app_name = "Axonix.app"
+    app_name = "Zem.app"
     app_path = dist_dir / app_name
     
     print(f"🏗  Building {app_name} in {dist_dir}...")
@@ -31,15 +32,15 @@ def create_mac_app():
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>Axonix</string>
+    <string>Zem</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.axonix.shell</string>
+    <string>com.zem.shell</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>Axonix</string>
+    <string>Zem</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -58,33 +59,14 @@ def create_mac_app():
     # Using AppleScript here is the most robust way to interact with Terminal.app
     # We use 'do script' to launch our specific command in a new window.
     
-    launcher_script = f"""#!/bin/bash
-# Launcher for Axonix Shell
-# Determines the project directory and runs 'uv run ax' in a NEW Terminal window.
-
-PROJECT_DIR="{project_root}"
-
-# AppleScript to launch Terminal with the command
-osascript <<EOF
-tell application "Terminal"
-    activate
-    do script "cd " & check with command " & quoted form of "{project_root}" & " && uv run ax; exit"
-end tell
-EOF
-
-# Close this launcher app so it doesn't stay in the dock
-killall Axonix
-"""
-    
-    # Corrected AppleScript logic for robust path handling
     launcher_content = f"""#!/bin/bash
 PROJECT_DIR="{project_root}"
 
-osascript -e 'tell application "Terminal" to do script "cd \\"'$PROJECT_DIR'\\" && clear && uv run ax"'
+osascript -e 'tell application "Terminal" to do script "cd \\"'$PROJECT_DIR'\\" && clear && uv run zem"'
 osascript -e 'tell application "Terminal" to activate'
 """
 
-    executable_path = macos_dir / "Axonix"
+    executable_path = macos_dir / "Zem"
     with open(executable_path, "w") as f:
         f.write(launcher_content)
 

@@ -1,12 +1,12 @@
-from axonix.core.shell import Shell
-from axonix.config.settings import AppConfig
+from zem.config.settings import AppConfig
+from zem.core.shell import Shell
 
 
 def _shell_with_history_limit(tmp_path, limit: int) -> Shell:
     cfg = AppConfig(
         history={
             "enable": True,
-            "file": str(tmp_path / "axonix_history_test"),
+            "file": str(tmp_path / "zem_history_test"),
             "max_entries": limit,
             "load_on_start": False,
             "save_on_exit": False,
@@ -14,7 +14,7 @@ def _shell_with_history_limit(tmp_path, limit: int) -> Shell:
         },
         rc={
             "auto_create": False,
-            "file": str(tmp_path / "axonixrc_test"),
+            "file": str(tmp_path / "zemrc_test"),
         },
         venv={"auto": False},
     )

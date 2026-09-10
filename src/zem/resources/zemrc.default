@@ -1,0 +1,12 @@
+# Zem Shell Configuration File
+
+# Display welcome logo
+logo
+
+# Default Aliases
+alias l='ls -la'
+alias ..='cd ..'
+alias gs='git status'
+
+# Environment Variables
+set SHELL zem

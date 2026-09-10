@@ -1,6 +1,6 @@
 # Command Development Guide
 
-This guide explains how to develop builtin commands for Axonix shell using the enhanced `BaseCommand` class.
+This guide explains how to develop builtin commands for Zem shell using the enhanced `BaseCommand` class.
 
 ## BaseCommand Helper Methods
 
@@ -140,12 +140,12 @@ Much cleaner! 🎉
 Here's a template for a new builtin command:
 
 ```python
-from axonix.builtins.base import BaseCommand
-from axonix.errors.input_error import ArgumentError
+from zem.builtins.base import BaseCommand
+from zem.errors.input_error import ArgumentError
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from axonix.core.context import ExecutionContext
+    from zem.core.context import ExecutionContext
 
 
 class MyCommand(BaseCommand):
@@ -157,37 +157,94 @@ class MyCommand(BaseCommand):
     tags = ["builtin", "category"]
     
     def execute(
-        self, 
-        args: list[str], 
-        context: "ExecutionContext", 
-        stdin=None, 
-        stdout=None
-    ):
-        """Execute the command."""
-        # Validate arguments
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,   # optional; only passed if you declare it
+    ) -> int:
+        """Execute the command and return an exit code."""
+        # Validate arguments (raises ArgumentError -> exit code 2)
         self._require_args(args, min_count=1)
-        
-        # Use helper methods
+
         name = args[0]
         self._validate_identifier(name)
         stdin_content = self._read_stdin_all(stdin)
-        
-        # Command logic here
+
         result = process(name, stdin_content)
-        
-        # Output result
+        if result is None:
+            # Runtime failure: message on stderr, non-zero exit code
+            self._write_err(f"{self.name}: nothing to do for {name}\n", stderr)
+            return 1
+
         self._write(f"Result: {result}\n", stdout)
+        return 0
 ```
+
+## Exit Codes and Streams
+
+* Return an `int`. `None` is accepted for backwards compatibility and
+  means `0`, but new commands should be explicit.
+* Usage errors: raise `ArgumentError` (exit code 2). Any `CLIError`
+  subclass is mapped to its `exit_code` and its message is printed to
+  stderr by the executor, never into the stdout pipe.
+* Runtime failures: write a message with `_write_err(...)` and `return 1`.
+* Never assign `context.last_exit_code` inside `execute`. In pipelines the
+  builtin runs in a worker thread and that attribute is shared.
+* Colored output goes through `_print_colored(items, stdout)`. It degrades
+  to plain text automatically when stdout is a pipe, a file or a test
+  buffer, so `help | grep cd` and `help > out.txt` just work.
+
+## Variables and the Environment
+
+`context.variables` holds every shell variable; `context.exported` is the
+subset children inherit. Use the API instead of touching `os.environ`:
+
+```python
+context.set_var("FOO", "1")                  # shell-local (new name)
+context.set_var("PATH", new_path)            # stays exported (inherited name)
+context.set_var("BAR", "x", export=True)     # force export
+context.export_var("FOO")                    # promote an existing variable
+context.unexport_var("FOO")                  # keep the value, hide from children
+context.unset_var("FOO")                     # remove everywhere
+context.child_env()                          # dict passed to subprocesses
+```
+
+The `?` pseudo-variable (last exit code) is shell-local and never exported.
+
+## Main-Thread-Only Commands
+
+A single builtin on a line runs inline on the shell's main thread. Stages
+of a multi-command pipeline run in worker threads. If your command must
+never run in a worker (it nests shell execution, touches the terminal, or
+replaces the process — think `source`, `exec`, `fg`), set
+`main_thread_only = True`; the shell then refuses to put it in a pipeline
+with a clear error instead of misbehaving.
 
 ## Best Practices
 
-1. **Always use `_require_args`** instead of manual `if not args` checks
-2. **Use `_validate_identifier`** for variable/alias names
-3. **Use `_read_stdin_all`** for reading stdin content safely
-4. **Use `_write`** instead of direct `stdout.write()` calls
-5. **Provide helpful error messages** via ArgumentError
-6. **Document usage** with `help`, `usage`, and `tags` attributes
-7. **Test with pipes** to ensure stdin handling works correctly
+1. **Return an `int` exit code** from `execute`
+2. **Always use `_require_args`** instead of manual `if not args` checks
+3. **Use `_validate_identifier`** for variable/alias names
+4. **Use `_read_stdin_all`** for reading stdin content safely
+5. **Use `_write` / `_write_err`** instead of direct stream writes
+6. **Provide helpful error messages** via ArgumentError
+7. **Document usage** with `help`, `usage`, `tags` and `examples` attributes
+8. **Test with pipes and redirects** to ensure stdin/stdout handling works
+
+## Completion and Plugin Config
+
+* Override `get_completer()` to return a `BaseArgCompleter` for argument
+  completion (see `src/zem/ui/completers/base.py`).
+* Override `get_default_config()` to ship defaults; the shell writes them
+  into `config.json` under `plugins.<name>` on first start. Read them back
+  with `self.get_plugin_config(context)`.
+
+## External Plugins
+
+Drop a `.py` file into `~/.zem/plugins/`. It is imported after the
+bundled commands and may reuse a builtin's name to override it.
 
 ## Auto-Registration
 
@@ -199,7 +256,7 @@ class MyNewCommand(BaseCommand):
     help = "My new command"
     
     def execute(self, args, context, stdin=None, stdout=None):
-        pass
+        return 0
 
 # No need to manually register - it happens in __init_subclass__!
 ```

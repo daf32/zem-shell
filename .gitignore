@@ -4,6 +4,7 @@
 secrets/
 docker-compose.override.yml
 config.json
+.ruff_cache
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -138,3 +139,4 @@ dmypy.json
 .claude
 .CLAUDE.md
 .MEMORY.md
+.zed/
