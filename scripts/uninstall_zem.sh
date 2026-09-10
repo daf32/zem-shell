@@ -9,7 +9,7 @@ if ! command -v uv &> /dev/null; then
     exit 1
 fi
 
-# Unisntall the package
+# Uninstall the package
 uv tool uninstall zem
 
 echo ""
