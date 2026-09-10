@@ -227,3 +227,20 @@ def test_job_specs(shell, run):
     for bad in ("%9", "%zzz", "%/bin/sleep"):
         with pytest.raises(Exception, match="job"):
             t.get(bad)
+
+
+def test_wait_reports_status_of_already_finished_job(shell, run):
+    """CI race: the child exits before `wait` runs and `reap()` has
+    already dropped it from the table — its status must still be returned."""
+    run(shell, "/bin/sh -c 'exit 3' &")
+    job = shell.context._jobs.get("%1")
+    job.procs[0].wait()          # definitely finished
+    time.sleep(0.05)
+    assert run(shell, "wait %1")[0] == 3
+    run(shell, "/bin/sleep 5 &")
+    job = shell.context._jobs.get("%1")
+    os.killpg(job.pgid, signal.SIGTERM)
+    job.procs[0].wait()
+    assert run(shell, "wait %1")[0] == 128 + signal.SIGTERM
+    code, _, err = run(shell, "wait %1")   # gone for good now
+    assert code == 1 and "no such job" in err
