@@ -1,6 +1,6 @@
 [project]
 name = "zem"
-version = "0.9.11"
+version = "0.9.12"
 description = "A modular Python-based shell focused on extensibility and speed"
 readme = "README.md"
 license = "MIT"

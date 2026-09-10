@@ -6,6 +6,7 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-09-10
 ### Removed
 - Automatic migration of files from the pre-rename layout
   (`~/.config/axonix`, `~/.axonixrc`, `~/.axonix_history`, `~/.axonix/`).
