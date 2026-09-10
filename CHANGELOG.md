@@ -6,6 +6,7 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-09-10
 ### Changed
 - **Renamed Axonix → Zem.** Package `zem`, command `zem`, config at
   `~/.config/zem/config.json`, rc file `~/.zemrc`, history
