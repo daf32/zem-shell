@@ -51,25 +51,36 @@ def _get_file_type_info(path: str) -> str:
         return ""
 
 
+def _current_word(text: str) -> str:
+    """The word under the cursor: text after the last unescaped blank."""
+    i = len(text)
+    while i > 0:
+        if text[i - 1].isspace() and not (i >= 2 and text[i - 2] == "\\"):
+            break
+        i -= 1
+    return text[i:]
+
+
 class EnhancedPathCompleter(PathCompleter):
-    """PathCompleter with file type metadata in completion display."""
-    
+    """PathCompleter with file type metadata in completion display.
+
+    prompt_toolkit's PathCompleter treats the *entire* text before the
+    cursor as the path, so it only ever worked when the path was the
+    whole line. This wrapper completes the current word instead, which
+    is what an argument position needs.
+    """
+
     def get_completions(
         self, document: Document, complete_event: CompleteEvent
     ) -> Iterable[Completion]:
-        """Get path completions with file type info."""
-        for completion in super().get_completions(document, complete_event):
-            # Get the full path for type detection
-            text_before = document.text_before_cursor
-            
-            # Find the start of the path being completed
-            path_start = len(text_before) + completion.start_position
-            if path_start >= 0:
-                prefix = text_before[path_start:]
-            else:
-                prefix = ""
-            
-            # Construct full path
+        """Get path completions (for the current word) with file type info."""
+        word = _current_word(document.text_before_cursor)
+        sub_document = Document(word, len(word))
+        for completion in super().get_completions(sub_document, complete_event):
+            # start_position is relative to the cursor, so it stays valid
+            # for the full document.
+            path_start = len(word) + completion.start_position
+            prefix = word[:path_start] if path_start >= 0 else ""
             full_path = prefix + completion.text
             
             # If it's a relative path, make it relative to cwd

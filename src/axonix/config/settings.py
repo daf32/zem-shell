@@ -32,6 +32,7 @@ class InputSettings(BaseModel):
     show_venv_info: bool = True
     show_exit_code: bool = True
     color_prompt: bool = True
+    auto_suggest: bool = True  # fish-style ghost text from history
 
 class HistorySettings(BaseModel):
     enable: bool = True

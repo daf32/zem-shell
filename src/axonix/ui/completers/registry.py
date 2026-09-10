@@ -4,20 +4,24 @@ from axonix.ui.completers.base import BaseArgCompleter
 
 
 class CompleterRegistry:
-    """Registry for command argument completers."""
-    
-    _completers: Dict[str, BaseArgCompleter] = {}
+    """Maps command names to argument completers.
 
-    @classmethod
-    def register(cls, command_name: str, completer: BaseArgCompleter):
-        """Register a completer for a specific command."""
-        cls._completers[command_name] = completer
+    One instance per `AxonixCompleter` (i.e. per shell). It used to be a
+    class-level dict shared by every shell in the process, which made
+    tests and multiple shell instances clobber each other.
+    """
 
-    @classmethod
-    def get(cls, command_name: str) -> BaseArgCompleter | None:
-        """Get completer for a command."""
-        return cls._completers.get(command_name)
-    
-    @classmethod
-    def get_all(cls) -> Dict[str, BaseArgCompleter]:
-        return cls._completers
+    def __init__(self) -> None:
+        self._completers: Dict[str, BaseArgCompleter] = {}
+
+    def register(self, command_name: str, completer: BaseArgCompleter) -> None:
+        self._completers[command_name] = completer
+
+    def unregister(self, command_name: str) -> None:
+        self._completers.pop(command_name, None)
+
+    def get(self, command_name: str) -> BaseArgCompleter | None:
+        return self._completers.get(command_name)
+
+    def get_all(self) -> Dict[str, BaseArgCompleter]:
+        return dict(self._completers)

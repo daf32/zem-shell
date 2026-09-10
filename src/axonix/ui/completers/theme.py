@@ -11,26 +11,24 @@ class ThemeCompleter(BaseArgCompleter):
     
     SUBCOMMANDS = ["list", "set", "preview", "export", "import", "install", "variants"]
     
-    def __init__(self, shell_config):
+    def __init__(self, shell_config=None):
         self.config = shell_config
         self.path_completer = PathCompleter(expanduser=True)
-        self._cached_themes = None
 
     @property
     def theme_names(self) -> List[str]:
-        """Get available theme names (cached lazy load)."""
-        if self._cached_themes is None:
-            try:
-                from axonix.utils.themes import ThemeManager
-                manager = ThemeManager(self.config)
-                self._cached_themes = sorted(manager.list_themes().keys())
-            except Exception:
-                self._cached_themes = []
-        return self._cached_themes
-    
-    def invalidate_cache(self):
-        """Invalidate the theme cache (call after theme import/install)."""
-        self._cached_themes = None
+        """Available theme names, scanned on every call.
+
+        The scan is a handful of small JSON files, and computing it fresh
+        means `theme import`/`theme install` show up immediately.
+        """
+        try:
+            from axonix.config.settings import AppConfig
+            from axonix.utils.themes import ThemeManager
+            manager = ThemeManager(self.config or AppConfig())
+            return sorted(manager.list_themes().keys())
+        except Exception:
+            return []
 
     def get_completions(
         self, document: Document, parts: List[str], word_before: str

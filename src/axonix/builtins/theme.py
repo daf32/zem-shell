@@ -203,6 +203,5 @@ class ThemeCommand(BaseCommand):
 
     def get_completer(self):
         """Return the ThemeCompleter."""
-        from axonix.config.settings import AppConfig
         from axonix.ui.completers.theme import ThemeCompleter
-        return ThemeCompleter(AppConfig())
+        return ThemeCompleter()

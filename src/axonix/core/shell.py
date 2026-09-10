@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.styles import Style
 
 from axonix.builtins import DEFAULT_USER_PLUGINS_DIR, load_plugins
@@ -240,6 +241,9 @@ class Shell:
             # Right prompt
             'rprompt': c.comment,
             'duration': c.warning,
+
+            # fish-style ghost text from history
+            'auto-suggestion': c.comment,
         })
 
     def _setup_prompt_session(self):
@@ -271,17 +275,19 @@ class Shell:
             # Combine with in-memory context history (newest first for UI logic handling)
             combined = history_items + self.context.history
             
-            searcher = FuzzyHistorySearch(combined)
+            searcher = FuzzyHistorySearch(combined, self.config.colors)
             result = await searcher.run_async()
             
             if result:
                 event.current_buffer.text = result
                 event.current_buffer.cursor_position = len(result)
 
+        auto_suggest = AutoSuggestFromHistory() if self.config.input.auto_suggest else None
         self.session = PromptSession(
             history=history,
             lexer=AxonixLexer(self),
             completer=AxonixCompleter(self),
+            auto_suggest=auto_suggest,
             style=self.style,
             complete_while_typing=True,
             key_bindings=kb
@@ -430,6 +436,9 @@ class Shell:
         return parts
 
     def _get_input(self):
+        lexer = getattr(self.session, "lexer", None)
+        if hasattr(lexer, "clear_path_cache"):
+            lexer.clear_path_cache()
         real_cwd = os.getcwd()
         display_path = self._format_path(real_cwd)
         exit_code = self.context.last_exit_code

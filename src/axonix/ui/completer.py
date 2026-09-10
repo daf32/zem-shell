@@ -1,161 +1,125 @@
-from typing import Iterable, List, Optional, Set
+from typing import Iterable, List, Set
 
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 
+from axonix.core.scan import NORMAL, scan
 from axonix.ui.completers.defaults import (
-    DirectoryCompleter,
     DockerCompleter,
     EnhancedPathCompleter,
     GitCompleter,
     NpmCompleter,
     PipCompleter,
+    _current_word,
 )
 from axonix.ui.completers.registry import CompleterRegistry
-from axonix.ui.completers.theme import ThemeCompleter
-from axonix.utils.executables import get_system_commands
+from axonix.utils.executables import get_system_commands, refresh_system_commands
 
 
 class AxonixCompleter(Completer):
     """Main completer for Axonix shell with context-aware completion."""
-    
+
+    #: Argument completers for common external tools.
+    DEFAULT_COMPLETERS = {
+        "git": GitCompleter,
+        "pip": PipCompleter,
+        "pip3": PipCompleter,
+        "docker": DockerCompleter,
+        "npm": NpmCompleter,
+        "npx": NpmCompleter,
+    }
+
     def __init__(self, shell):
         self.shell = shell
         self.path_completer = EnhancedPathCompleter(expanduser=True)
-        self._system_commands: Optional[List[str]] = None
-        self._registered = False
-        
-        # Register default completers
+        self.registry = CompleterRegistry()
         self._register_default_completers()
 
     def _register_default_completers(self):
-        """Register built-in completers for common commands."""
-        if self._registered:
-            return
-        
-        # Core shell completers
-        CompleterRegistry.register("git", GitCompleter())
-        CompleterRegistry.register("cd", DirectoryCompleter())
-        CompleterRegistry.register("theme", ThemeCompleter(self.shell.config))
-        
-        # Package manager completers
-        CompleterRegistry.register("pip", PipCompleter())
-        CompleterRegistry.register("pip3", PipCompleter())
-        CompleterRegistry.register("docker", DockerCompleter())
-        CompleterRegistry.register("npm", NpmCompleter())
-        CompleterRegistry.register("npx", NpmCompleter())
-        CompleterRegistry.register("yarn", NpmCompleter())  # Similar commands
-        CompleterRegistry.register("pnpm", NpmCompleter())  # Similar commands
-        
-        # Also register completers from commands that provide them
+        """Register built-in completers, then the ones commands provide."""
+        for name, factory in self.DEFAULT_COMPLETERS.items():
+            self.registry.register(name, factory())
+
+        # Builtins/plugins override the defaults for their own name.
         for name, cmd in self.shell.commands.items():
             completer = cmd.get_completer()
             if completer is not None:
-                CompleterRegistry.register(name, completer)
-        
-        self._registered = True
+                self.registry.register(name, completer)
 
     @property
     def system_commands(self) -> List[str]:
-        """Get system commands (cached)."""
-        if self._system_commands is None:
-            self._system_commands = get_system_commands()
-        return self._system_commands
-    
+        """Executables on the current PATH (cached per PATH value)."""
+        return get_system_commands()
+
     def invalidate_cache(self):
-        """Invalidate the system commands cache."""
-        self._system_commands = None
+        """Drop the PATH scan cache (e.g. after installing new binaries)."""
+        refresh_system_commands()
 
     def _find_command_start(self, text: str) -> int:
-        """Find the start of the current command in the text.
-        
-        Returns the index after the last unescaped separator (|, ;, &&, ||).
-        """
-        last_separator_idx = -1
-        i = 0
+        """Index just after the last unquoted `|`, `||`, `;` or `&&`."""
         ops = self.shell.config.operators
-        
-        while i < len(text):
-            char = text[i]
-            
-            # Skip escaped characters
-            if i > 0 and text[i-1] == ops.escape:
-                i += 1
-                continue
-            
-            # Check for multi-char operators first
-            if char == '&' and i + 1 < len(text) and text[i+1] == '&':
-                last_separator_idx = i + 1
-                i += 2
-                continue
-            
-            if char == ops.pipe:
-                if i + 1 < len(text) and text[i+1] == ops.pipe:
-                    last_separator_idx = i + 1
-                    i += 2
-                    continue
-                last_separator_idx = i
-            
-            elif char == ops.semicolon:
-                last_separator_idx = i
-            
+        chars, _, _ = scan(text, ops)
+        start = 0
+        i = 0
+        while i < len(chars):
+            ch, escaped, state = chars[i]
+            if not escaped and state == NORMAL:
+                nxt = chars[i + 1] if i + 1 < len(chars) else None
+                if ch == ops.pipe:
+                    if nxt and nxt[0] == ops.pipe and not nxt[1] and nxt[2] == NORMAL:
+                        i += 1
+                    start = i + 1
+                elif ch == ops.semicolon:
+                    start = i + 1
+                elif ch == "&" and nxt and nxt[0] == "&" and not nxt[1] and nxt[2] == NORMAL:
+                    i += 1
+                    start = i + 1
             i += 1
-        
-        return last_separator_idx + 1
+        return start
 
     def get_completions(
         self, document: Document, complete_event: CompleteEvent
     ) -> Iterable[Completion]:
         """Get completions for the current input."""
         text_before = document.text_before_cursor
-        
-        # Find the start of the current command segment
+
         cmd_start = self._find_command_start(text_before)
         current_segment = text_before[cmd_start:]
         stripped_segment = current_segment.lstrip()
-        
-        # Parse segment into parts (simple split for now)
         parts = stripped_segment.split()
-        
-        # Determine if we are typing the command name itself
-        is_command_position = False
-        if not stripped_segment:
-            # Empty input or just whitespace
-            is_command_position = True
-        elif len(parts) == 1 and not current_segment.endswith(" "):
-            # Typing the first word
-            is_command_position = True
 
+        is_command_position = (
+            not stripped_segment
+            or (len(parts) == 1 and not current_segment[-1].isspace())
+        )
         word_before = document.get_word_before_cursor()
 
-        # Handle Command Name Completion
         if is_command_position:
-            yield from self._complete_command_name(word_before)
+            # Use the whole first word: prompt_toolkit's "word" stops at
+            # `-`, which would turn `docker-com` into a prefix of `com`.
+            yield from self._complete_command_name(parts[0] if parts else "")
             return
 
-        # Handle Argument Completion
         current_cmd_name = parts[0] if parts else ""
-        
-        # Check if command has an alias and resolve it
         resolved_cmd = current_cmd_name
         if current_cmd_name in self.shell.context.aliases:
-            alias_value = self.shell.context.aliases[current_cmd_name]
-            # Get first word of alias expansion
-            alias_parts = alias_value.split()
+            alias_parts = self.shell.context.aliases[current_cmd_name].split()
             if alias_parts:
                 resolved_cmd = alias_parts[0]
-        
-        # Try registered completer
-        completer = CompleterRegistry.get(resolved_cmd)
-        if completer:
-            for completion in completer.get_completions(document, parts, word_before):
-                yield completion
-            return
 
-        # Fallback: Path completion
-        for completion in self.path_completer.get_completions(document, complete_event):
-            yield completion
-    
+        completer = self.registry.get(resolved_cmd)
+        if completer is not None:
+            produced = False
+            for completion in completer.get_completions(document, parts, word_before):
+                produced = True
+                yield completion
+            if produced or _current_word(text_before).startswith("-"):
+                return
+            # Nothing specific to offer: fall through to paths, so e.g.
+            # `git add <TAB>` still completes files.
+
+        yield from self.path_completer.get_completions(document, complete_event)
+
     def _complete_command_name(self, prefix: str) -> Iterable[Completion]:
         """Complete command names (builtins, aliases, system commands)."""
         seen: Set[str] = set()

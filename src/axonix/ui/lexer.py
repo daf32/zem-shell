@@ -17,21 +17,24 @@ class AxonixLexer(Lexer):
     def __init__(self, shell):
         self.shell = shell
         self.config = shell.config
-        self._system_commands = None
         self._path_cache = {}  # Cache for path existence checks
         self._cache_size_limit = 100
-    
+
     @property
     def system_commands(self) -> set:
-        """Lazily load and cache system commands."""
-        if self._system_commands is None:
-            from axonix.utils.executables import get_system_commands
-            self._system_commands = set(get_system_commands())
-        return self._system_commands
-    
+        """Executables on the current PATH (cached per PATH value)."""
+        from axonix.utils.executables import get_system_commands
+        return set(get_system_commands())
+
     def invalidate_cache(self):
-        """Invalidate all caches."""
-        self._system_commands = None
+        """Drop every cache: PATH scan and path-existence results."""
+        from axonix.utils.executables import refresh_system_commands
+        refresh_system_commands()
+        self._path_cache.clear()
+
+    def clear_path_cache(self):
+        """Forget path-existence results (called before each prompt so a
+        file created by the previous command isn't still red)."""
         self._path_cache.clear()
     
     def _check_path_exists(self, path: str) -> bool:

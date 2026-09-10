@@ -15,24 +15,32 @@ from prompt_toolkit.widgets import Frame
 class FuzzyHistorySearch:
     """Fuzzy search through command history with interactive UI and match highlighting."""
     
-    # Style for the search UI
-    STYLE = Style.from_dict({
-        'frame.border': '#888888',
-        'frame.title': 'bold #8be9fd',
-        'search-label': '#50fa7b bold',
-        'search-input': '#f8f8f2',
-        'selected': 'bg:#44475a',
-        'selected-text': 'bg:#44475a #f8f8f2',
-        'selected-match': 'bg:#44475a bold #50fa7b',
-        'item': '#f8f8f2',
-        'item-dim': '#6272a4',
-        'match': 'bold #50fa7b',  # Highlighted matching characters
-        'no-match': '#ff5555 italic',
-        'counter': '#6272a4',
-        'hint': '#6272a4 italic',
-    })
-    
-    def __init__(self, history_strings: list[str]):
+    @staticmethod
+    def build_style(colors=None) -> Style:
+        """Style for the search UI, derived from the active theme's colours."""
+        info = getattr(colors, "info", "#8be9fd")
+        ok = getattr(colors, "operator", "#50fa7b")
+        comment = getattr(colors, "comment", "#6272a4")
+        error = getattr(colors, "error", "#ff5555")
+        prompt = getattr(colors, "prompt_symbol", "#f8f8f2")
+        return Style.from_dict({
+            'frame.border': comment,
+            'frame.title': f'bold {info}',
+            'search-label': f'{ok} bold',
+            'search-input': prompt,
+            'selected': 'reverse',
+            'selected-text': 'reverse',
+            'selected-match': f'reverse bold {ok}',
+            'item': prompt,
+            'item-dim': comment,
+            'match': f'bold {ok}',  # Highlighted matching characters
+            'no-match': f'{error} italic',
+            'counter': comment,
+            'hint': f'{comment} italic',
+        })
+
+    def __init__(self, history_strings: list[str], colors=None):
+        self.style = self.build_style(colors)
         # Deduplicate and reverse history (newest first)
         seen = set()
         self.history = []
@@ -265,7 +273,7 @@ class FuzzyHistorySearch:
         app = Application(
             layout=Layout(root_container, focused_element=search_field),
             key_bindings=kb,
-            style=self.STYLE,
+            style=self.style,
             full_screen=False,
             mouse_support=True
         )

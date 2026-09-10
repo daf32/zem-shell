@@ -40,6 +40,8 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- fish-style ghost-text suggestions from history (`input.auto_suggest`,
+  on by default).
 - Job control: `&` detaches the whole pipeline as a job (`[1] pid`),
   Ctrl-Z stops the foreground job, `jobs [-l|-p]`, `fg`, `bg`, `wait`,
   `kill` (understands `%N`, sends SIGCONT to stopped jobs), `disown`.
@@ -78,6 +80,17 @@ All notable changes to Axonix are documented here. The format follows
 - Test fixtures: `full_shell` (real builtin registry, headless) and `run()`.
 
 ### Fixed
+- Path completion for arguments never worked (`ls som<TAB>`, `cd sr<TAB>`):
+  the whole line was handed to the path completer as the path.
+- Commands whose argument completer had nothing to offer (`git add <TAB>`)
+  got no path completion either; now they fall back to paths.
+- Command-name completion broke on `-` (`docker-com<TAB>` completed `com`).
+- `|`, `;`, `&&` inside quotes started a new "command" for completion.
+- Newly installed or venv binaries stayed highlighted as errors until
+  `config reload`; the PATH scan is now cached per PATH value.
+- A file created by the previous command was still underlined as missing.
+- Ctrl-R search used hardcoded Dracula colours regardless of the theme.
+- `yarn`/`pnpm` offered npm-only flags.
 - Children inherited an ignored SIGTSTP/SIGTTIN/SIGTTOU/SIGQUIT from the
   shell and could not be suspended with Ctrl-Z.
 - `a | b &` only detached `b`; `a` was still waited on.

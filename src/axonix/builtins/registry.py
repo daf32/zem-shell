@@ -52,18 +52,11 @@ class CommandRegistry:
     @classmethod
     def get_all_commands(cls) -> Dict[str, BaseCommand]:
         """Get all registered commands."""
-        # Ensure all commands are instantiated and completers are registered
+        # Instantiate lazily. Completer registration is the UI layer's job
+        # (see AxonixCompleter) — this registry must stay UI-agnostic.
         for name in cls._command_classes:
             if name not in cls._commands:
-                cmd_instance = cls._command_classes[name]()
-                cls._commands[name] = cmd_instance
-                
-                # Check for autocompleter and register it
-                completer = cmd_instance.get_completer()
-                if completer:
-                    from axonix.ui.completers.registry import CompleterRegistry
-                    CompleterRegistry.register(name, completer)
-        
+                cls._commands[name] = cls._command_classes[name]()
         return cls._commands.copy()
     
     @classmethod
