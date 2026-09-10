@@ -1,6 +1,6 @@
 import os
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional
 
 from axonix.errors.parser_error import ParseError, UnclosedQuoteError
 
@@ -8,34 +8,118 @@ if TYPE_CHECKING:
     from axonix.config.settings import AppConfig
 
 class Parser:
-    NORMAL, SINGLE, DOUBLE = range(3)
+    NORMAL, SINGLE, DOUBLE, SUBST = range(4)
 
-    def __init__(self, text: str, variables: dict, aliases: dict, config: "AppConfig"):
+    def __init__(
+        self,
+        text: str,
+        variables: dict,
+        aliases: dict,
+        config: "AppConfig",
+        substitutor: Optional[Callable[[str], str]] = None,
+    ):
+        """
+        ``substitutor`` runs the text inside ``$(...)`` and returns its
+        output; without one, command substitution is a parse error.
+        """
         self.text = text
         self.variables = variables
         self.aliases = aliases
         self.config = config
+        self.substitutor = substitutor
 
-    def _walk(self, text: str):
+    # -- expansion helpers ----------------------------------------------------
+
+    def _literal(self, value: str) -> str:
+        """Escape expanded text so later passes read it back verbatim.
+
+        Expanded values (variables, command output) are spliced into the
+        raw token buffer, which `_remove_quotes` re-scans; a quote or
+        backslash in the value would otherwise be interpreted as syntax.
+        """
+        esc = self.config.operators.escape
+        for ch in (esc, self.config.operators.quote, self.config.operators.double_quote):
+            value = value.replace(ch, esc + ch)
+        return value
+
+    def _find_closing_paren(self, text: str, start: int) -> int:
+        """Index of the ``)`` matching the ``(`` at ``start`` (quote-aware)."""
+        depth = 0
         state = self.NORMAL
         escaped = False
-        for ch in text:
-            yield ch, escaped, state
-            
+        for i in range(start, len(text)):
+            ch = text[i]
             if escaped:
                 escaped = False
-            elif ch == self.config.operators.escape and state != self.SINGLE:
+                continue
+            if ch == self.config.operators.escape and state != self.SINGLE:
                 escaped = True
             elif state == self.NORMAL:
                 if ch == self.config.operators.quote:
                     state = self.SINGLE
                 elif ch == self.config.operators.double_quote:
                     state = self.DOUBLE
+                elif ch == "(":
+                    depth += 1
+                elif ch == ")":
+                    depth -= 1
+                    if depth == 0:
+                        return i
             elif state == self.SINGLE and ch == self.config.operators.quote:
                 state = self.NORMAL
             elif state == self.DOUBLE and ch == self.config.operators.double_quote:
                 state = self.NORMAL
-        
+        raise ParseError("Unclosed command substitution '$('")
+
+    def _substitute(self, text: str, open_idx: int) -> tuple[str, int]:
+        """Run the ``$( ... )`` starting at ``open_idx`` (the ``(``).
+
+        Returns ``(output, index_after_closing_paren)``. Trailing newlines
+        are stripped like in POSIX shells.
+        """
+        if self.substitutor is None:
+            raise ParseError("Command substitution is not available here")
+        close = self._find_closing_paren(text, open_idx)
+        output = self.substitutor(text[open_idx + 1:close])
+        return output.rstrip("\n"), close + 1
+
+    def _walk(self, text: str):
+        """Yield ``(char, escaped, state)`` for every character.
+
+        ``state`` is ``SUBST`` while inside ``$( ... )`` (any nesting depth)
+        so the pipe/logic splitters leave those characters alone; the
+        tokenizer later hands the whole substitution to the substitutor.
+        """
+        ops = self.config.operators
+        state = self.NORMAL
+        escaped = False
+        depth = 0
+        for i, ch in enumerate(text):
+            yield ch, escaped, (self.SUBST if depth else state)
+
+            if escaped:
+                escaped = False
+            elif ch == ops.escape and state != self.SINGLE:
+                escaped = True
+            elif state == self.NORMAL:
+                if ch == ops.quote:
+                    state = self.SINGLE
+                elif ch == ops.double_quote:
+                    state = self.DOUBLE
+                elif ch == ops.variable and text[i + 1:i + 2] == "(":
+                    depth += 1
+                elif ch == ")" and depth:
+                    depth -= 1
+            elif state == self.SINGLE and ch == ops.quote:
+                state = self.NORMAL
+            elif state == self.DOUBLE:
+                if ch == ops.double_quote:
+                    state = self.NORMAL
+                elif ch == ops.variable and text[i + 1:i + 2] == "(":
+                    depth += 1
+                elif ch == ")" and depth:
+                    depth -= 1
+
         if state != self.NORMAL:
             raise UnclosedQuoteError()
 
@@ -189,9 +273,21 @@ class Parser:
                     state, in_token = self.DOUBLE, True
                     current.append(ch)
                 elif ch == self.config.operators.variable:
-                    name, next_i = self._get_var_name(text, i + 1)
-                    current.append(str(self.variables.get(name, "")))
-                    i, in_token = next_i - 1, True
+                    if text[i + 1:i + 2] == "(":
+                        output, next_i = self._substitute(text, i + 1)
+                        # Word-split the output (unquoted context).
+                        pieces = output.split()
+                        for idx, piece in enumerate(pieces):
+                            if idx > 0:
+                                tokens.append("".join(current))
+                                current = []
+                            current.append(self._literal(piece))
+                            in_token = True
+                        i = next_i - 1
+                    else:
+                        name, next_i = self._get_var_name(text, i + 1)
+                        current.append(self._literal(str(self.variables.get(name, ""))))
+                        i, in_token = next_i - 1, True
                 elif ch in (
                     self.config.operators.redirect_output,
                     self.config.operators.redirect_input,
@@ -252,9 +348,14 @@ class Parser:
                     state = self.NORMAL
                     current.append(ch)
                 elif ch == self.config.operators.variable:
-                    name, next_i = self._get_var_name(text, i + 1)
-                    current.append(str(self.variables.get(name, "")))
-                    i = next_i - 1
+                    if text[i + 1:i + 2] == "(":
+                        output, next_i = self._substitute(text, i + 1)
+                        current.append(self._literal(output))  # verbatim
+                        i = next_i - 1
+                    else:
+                        name, next_i = self._get_var_name(text, i + 1)
+                        current.append(self._literal(str(self.variables.get(name, ""))))
+                        i = next_i - 1
                 else:
                     current.append(ch)
             

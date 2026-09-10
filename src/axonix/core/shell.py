@@ -20,6 +20,7 @@ from axonix.core.executor import CommandExecutor
 from axonix.core.parser import Parser
 from axonix.errors.base_error import CLIError
 from axonix.errors.execute_error import ExecutionError
+from axonix.errors.parser_error import ParseError
 from axonix.ui.completer import AxonixCompleter
 from axonix.ui.history import AxonixFileHistory
 from axonix.ui.lexer import AxonixLexer
@@ -444,29 +445,8 @@ class Shell:
             self._add_history(user_input)
 
         try:
-            units = Parser(
-                user_input,
-                self.context.variables,
-                self.context.aliases,
-                self.config
-            ).parse()
-
-            last_exit_code = 0
-            for unit in units:
-                pipeline = unit["pipeline"]
-                logic = unit["logic"]
-
-                # Execute the pipeline
-                last_exit_code = self._execute_pipeline(pipeline)
-                self.context.last_exit_code = last_exit_code
-
-                # Logic control
-                if logic == "&&" and last_exit_code != 0:
-                    break
-                if logic == "||" and last_exit_code == 0:
-                    break
-                # Semicolon (;) continues regardless of exit code
-
+            units = self._parse(user_input)
+            self._execute_units(units)
         except CLIError as e:
             self.context.last_exit_code = getattr(e, "exit_code", 1)
             self._print_error(str(e))
@@ -476,15 +456,78 @@ class Shell:
 
 
 
-    def _execute_pipeline(self, pipeline: list[dict]) -> int:
+    def _parse(self, text: str) -> list[dict]:
+        return Parser(
+            text,
+            self.context.variables,
+            self.context.aliases,
+            self.config,
+            substitutor=self._capture_output,
+        ).parse()
+
+    def _execute_units(self, units: list[dict], *, final_stdout_fd: int | None = None) -> int:
+        """Run parsed units honouring `&&`, `||`, `;`. Returns the last exit code.
+
+        ``final_stdout_fd`` redirects the stdout of every pipeline's last
+        stage (used by command substitution).
+        """
+        last_exit_code = 0
+        for unit in units:
+            last_exit_code = self._execute_pipeline(
+                unit["pipeline"], final_stdout_fd=final_stdout_fd
+            )
+            self.context.last_exit_code = last_exit_code
+
+            logic = unit["logic"]
+            if logic == "&&" and last_exit_code != 0:
+                break
+            if logic == "||" and last_exit_code == 0:
+                break
+            # `;` continues regardless of exit code
+        return last_exit_code
+
+    def _capture_output(self, text: str) -> str:
+        """Run ``text`` and return its stdout — the engine behind ``$(...)``.
+
+        Nested substitutions work because the parser is handed this same
+        method. The output is drained by a helper thread so producers
+        writing more than the pipe buffer can hold don't deadlock against
+        the synchronous wait in `_execute_pipeline`. The last exit code is
+        restored afterwards, so `$?` reflects the enclosing command.
+        """
+        units = self._parse(text)
+        for unit in units:
+            if unit["pipeline"][-1].get("background"):
+                raise ParseError("Background jobs are not allowed inside $(...)")
+
+        read_fd, write_fd = os.pipe()
+        chunks: list[bytes] = []
+
+        def drain():
+            with os.fdopen(read_fd, "rb") as reader:
+                chunks.append(reader.read())
+
+        reader_thread = threading.Thread(target=drain, daemon=True)
+        reader_thread.start()
+
+        saved_exit_code = self.context.last_exit_code
+        try:
+            self._execute_units(units, final_stdout_fd=write_fd)
+        finally:
+            os.close(write_fd)
+            reader_thread.join()
+            self.context.last_exit_code = saved_exit_code
+
+        return b"".join(chunks).decode("utf-8", errors="replace")
+
+    def _execute_pipeline(self, pipeline: list[dict], *, final_stdout_fd: int | None = None) -> int:
         """Execute a single pipeline using process groups."""
 
         processes = []
-        pipe_fds = []
         prev_pipe_read = None
         exit_code = 0
         pgid = None
-        has_external = False  # ⭐ ВАЖНО
+        has_external = False
         # Honour `&` only when it terminates a pipeline whose last stage is an
         # external process; backgrounding a pure-builtin pipeline doesn't make
         # sense (builtins run in this process and would still mutate context).
@@ -496,12 +539,23 @@ class Shell:
                 if cmd is not None and cmd.main_thread_only:
                     raise ExecutionError(f"{cmd.name}: cannot be used in a pipeline")
 
-        def safe_close(fd):
-            if fd is not None:
-                try:
-                    os.close(fd)
-                except OSError:
-                    pass
+        # Every fd this method opens is tracked here and closed exactly once:
+        # fd numbers get reused immediately, so a second close would hit
+        # whatever was opened in between (e.g. a worker thread's dup).
+        open_fds: set[int] = set()
+
+        def track(fd: int) -> int:
+            open_fds.add(fd)
+            return fd
+
+        def close(fd: int | None) -> None:
+            if fd is None or fd not in open_fds:
+                return
+            open_fds.discard(fd)
+            try:
+                os.close(fd)
+            except OSError:
+                pass
 
         try:
             for i, cmd_info in enumerate(pipeline):
@@ -516,40 +570,42 @@ class Shell:
 
                 is_last = i == len(pipeline) - 1
                 current_stdin = prev_pipe_read if i > 0 else None
+                prev_pipe_read = None
 
                 if stdin_file:
-                    fd_in = os.open(stdin_file, os.O_RDONLY)
-                    if current_stdin is not None:
-                        safe_close(current_stdin)
-                    current_stdin = fd_in
+                    close(current_stdin)
+                    current_stdin = track(os.open(stdin_file, os.O_RDONLY))
 
                 current_stdout = None
-                pipe_read = pipe_write = None
+                pipe_read = None
 
                 if not is_last:
                     pipe_read, pipe_write = os.pipe()
-                    pipe_fds.extend([pipe_read, pipe_write])
-                    current_stdout = pipe_write
+                    track(pipe_read)
+                    current_stdout = track(pipe_write)
 
                 if stdout_file:
                     flags = os.O_WRONLY | os.O_CREAT | (os.O_APPEND if append else os.O_TRUNC)
                     fd_out = os.open(stdout_file, flags, 0o644)
-                    if current_stdout is not None:
-                        safe_close(current_stdout)
-                        safe_close(pipe_read)
-                        pipe_read = None
-                    current_stdout = fd_out
+                    close(current_stdout)
+                    close(pipe_read)
+                    pipe_read = None
+                    current_stdout = track(fd_out)
+                elif is_last and final_stdout_fd is not None:
+                    # Command substitution: the caller owns `final_stdout_fd`;
+                    # hand this stage its own copy so the usual close is safe.
+                    current_stdout = track(os.dup(final_stdout_fd))
 
                 current_stderr = None
                 if stderr_file:
                     flags = os.O_WRONLY | os.O_CREAT | (
                         os.O_APPEND if stderr_append else os.O_TRUNC
                     )
-                    current_stderr = os.open(stderr_file, flags, 0o644)
+                    current_stderr = track(os.open(stderr_file, flags, 0o644))
                 elif stderr_to_stdout and current_stdout is not None:
                     # `2>&1` / `&>`: stderr shares stdout's destination. When
                     # stdout is the terminal there is nothing to duplicate.
-                    current_stderr = os.dup(current_stdout)
+                    current_stderr = track(os.dup(current_stdout))
 
                 command = self.commands.get(cmd_name)
 
@@ -560,9 +616,6 @@ class Shell:
                     exit_code = self.executor.run_builtin_inline(
                         command, args, current_stdin, current_stdout, current_stderr
                     )
-                    safe_close(current_stdout)
-                    safe_close(current_stdin)
-                    safe_close(current_stderr)
                     self.context.last_exit_code = exit_code
                     return exit_code
 
@@ -587,9 +640,11 @@ class Shell:
                     has_external = True
                     processes.append(process)
 
-                safe_close(current_stdout)
-                safe_close(current_stdin)
-                safe_close(current_stderr)
+                # The stage owns duplicates (builtins) or inherited copies
+                # (children); our originals must go so readers see EOF.
+                close(current_stdout)
+                close(current_stdin)
+                close(current_stderr)
                 prev_pipe_read = pipe_read
 
             # Only hand the terminal to the foreground process group; for
@@ -654,11 +709,10 @@ class Shell:
 
             self.executor.clear_finished()
 
-            for fd in pipe_fds:
-                safe_close(fd)
-
-            if prev_pipe_read is not None:
-                safe_close(prev_pipe_read)
+            # Anything still open here is a leftover from an early exit
+            # (exception mid-pipeline, inline return).
+            for fd in list(open_fds):
+                close(fd)
 
     def run(self) -> int:
         """Run the interactive loop; returns the shell's exit status."""

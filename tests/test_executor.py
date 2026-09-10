@@ -383,3 +383,70 @@ def test_tilde_reaches_command(tmp_path, make_headless_shell, p1_builtins, monke
     shell = make_headless_shell(commands=p1_builtins)
     shell._execute_line("techo ~/x")
     assert capfd.readouterr().out == f"{tmp_path}/x\n"
+
+
+# --------------------------------------------------------------------------
+# P4a: command substitution end-to-end
+# --------------------------------------------------------------------------
+
+class _BigOutput(BaseCommand):
+    name = "tbig"
+
+    def execute(self, args, context, stdin=None, stdout=None):
+        self._write("x" * 200_000 + "\n", stdout)
+        return 0
+
+
+@pytest.fixture
+def p4_builtins(p1_builtins):
+    return {**p1_builtins, "tbig": _BigOutput()}
+
+
+def test_substitution_of_builtin(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo [$(techo hi there)]")
+    assert capfd.readouterr().out == "[hi there]\n"
+
+
+def test_substitution_of_external(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(/bin/echo ext)")
+    assert capfd.readouterr().out == "ext\n"
+
+
+def test_nested_substitution(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(techo a $(techo b) c)")
+    assert capfd.readouterr().out == "a b c\n"
+
+
+def test_substitution_larger_than_pipe_buffer(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(tbig) | tcat")
+    assert len(capfd.readouterr().out) == 200_001
+
+
+def test_substitution_with_pipeline_inside(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(techo piped | tcat)")
+    assert capfd.readouterr().out == "piped\n"
+
+
+def test_substitution_does_not_change_exit_code(make_headless_shell, p4_builtins):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(tfail)")
+    assert shell.context.last_exit_code == 0
+
+
+def test_substitution_error_propagates(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(nope-cmd-xyz-not-real)")
+    assert shell.context.last_exit_code == 2
+    assert "Unknown command" in capfd.readouterr().err
+
+
+def test_background_inside_substitution_is_rejected(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo $(/bin/sleep 1 &)")
+    assert shell.context.last_exit_code == 1
+    assert "not allowed" in capfd.readouterr().err

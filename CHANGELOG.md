@@ -40,6 +40,9 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- Command substitution `$(...)`, nested and quoted forms included. Output
+  is word-split when unquoted and kept verbatim inside double quotes;
+  `$?` is not affected by the substituted command.
 - Parser: `~`, `~/path`, `~user/path` expansion (unquoted, also in
   redirect targets); stderr redirections `2>`, `2>>`, `2>&1`, `&>`, `&>>`.
   A missing redirect target is now a parse error instead of being
@@ -57,6 +60,10 @@ All notable changes to Axonix are documented here. The format follows
 - Test fixtures: `full_shell` (real builtin registry, headless) and `run()`.
 
 ### Fixed
+- A variable whose value contained a quote (`set X "it's"; echo $X`) was
+  mangled on expansion.
+- Pipeline fds were closed twice in some error paths, which could close
+  an unrelated descriptor that had reused the number.
 - `AppConfig` read the config path once at class definition, so changing
   `AXONIX_CONFIG_PATH` after import (or in tests) was ignored.
 - Coloured builtins wrote CRLF line endings when redirected to a file.

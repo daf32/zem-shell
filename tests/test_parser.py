@@ -311,3 +311,86 @@ def test_redirects_anywhere_in_the_command():
     c = _cmd("> out echo a < in b")
     assert c["name"] == "echo" and c["args"] == ["a", "b"]
     assert (c["stdin_file"], c["stdout_file"]) == ("in", "out")
+
+
+# -- command substitution (parser level, fake substitutor) ---------------
+
+def _sub_args(line: str, substitutor, variables=None) -> list[str]:
+    units = Parser(line, variables or {}, {}, AppConfig(), substitutor=substitutor).parse()
+    cmd = units[0]["pipeline"][0]
+    return [cmd["name"], *cmd["args"]]
+
+
+def test_substitution_is_word_split_when_unquoted():
+    assert _sub_args("echo $(x)", lambda s: "a  b\nc\n") == ["echo", "a", "b", "c"]
+
+
+def test_substitution_verbatim_in_double_quotes():
+    assert _sub_args('echo "$(x)"', lambda s: "a  b\nc\n\n") == ["echo", "a  b\nc"]
+
+
+def test_substitution_joins_with_adjacent_text():
+    assert _sub_args("echo pre$(x)post", lambda s: "MID") == ["echo", "preMIDpost"]
+
+
+def test_substitution_receives_inner_text_and_nests():
+    seen = []
+
+    def fake(inner):
+        seen.append(inner)
+        return "out"
+
+    assert _sub_args("echo $(a $(b) c)", fake) == ["echo", "out"]
+    # The parser hands the raw inner text to the substitutor; nesting is
+    # the substitutor's job (the shell recurses).
+    assert seen == ["a $(b) c"]
+
+
+def test_substitution_with_quotes_inside_parens():
+    seen = []
+    _sub_args("echo $(printf ')')", lambda s: seen.append(s) or "x")
+    assert seen == ["printf ')'"]
+
+
+def test_substitution_output_quotes_are_literal():
+    assert _sub_args("echo $(x)", lambda s: "it's \"q\"") == ["echo", "it's", '"q"']
+
+
+def test_substitution_empty_output_yields_no_word():
+    assert _sub_args("echo $(x) b", lambda s: "\n") == ["echo", "b"]
+
+
+def test_substitution_unclosed_raises():
+    with pytest.raises(ParseError):
+        _sub_args("echo $(x", lambda s: "")
+
+
+def test_substitution_without_substitutor_raises():
+    with pytest.raises(ParseError):
+        _args("echo $(x)")
+
+
+def test_substitution_in_single_quotes_is_literal():
+    assert _sub_args("echo '$(x)'", lambda s: "no") == ["echo", "$(x)"]
+
+
+def test_variable_value_with_quotes_is_literal():
+    assert _args("echo $X", {"X": "it's"}) == ["echo", "it's"]
+    assert _args('echo "$X"', {"X": 'say "hi"'}) == ["echo", 'say "hi"']
+
+
+def test_substitution_containing_pipe_and_logic_is_not_split():
+    seen = []
+    units = Parser(
+        "echo $(a | b && c ; d) | tail", {}, {}, AppConfig(),
+        substitutor=lambda s: seen.append(s) or "x",
+    ).parse()
+    assert seen == ["a | b && c ; d"]
+    assert len(units) == 1 and len(units[0]["pipeline"]) == 2
+
+
+def test_substitution_in_double_quotes_with_pipe_inside():
+    seen = []
+    Parser('echo "$(a | b)"', {}, {}, AppConfig(),
+           substitutor=lambda s: seen.append(s) or "x").parse()
+    assert seen == ["a | b"]
