@@ -326,3 +326,60 @@ def test_exit_non_numeric_is_usage_error(full_shell, run):
     assert code == 2
     assert full_shell.context.running is True
     assert "numeric argument required" in err
+
+
+# --------------------------------------------------------------------------
+# P3: stderr redirections end-to-end
+# --------------------------------------------------------------------------
+
+def test_stderr_redirect_to_file(tmp_path, make_headless_shell, p1_builtins, capfd):
+    err = tmp_path / "err"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"traisesarg x 2> {err}")
+    assert "Invalid argument" in err.read_text()
+    assert capfd.readouterr().err == ""
+
+
+def test_stderr_append(tmp_path, make_headless_shell, p1_builtins):
+    err = tmp_path / "err"
+    err.write_text("first\n")
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"twriteserr 2>> {err} > /dev/null")
+    assert err.read_text() == "first\nerr\n"
+
+
+def test_stderr_to_stdout_into_file(tmp_path, make_headless_shell, p1_builtins):
+    out = tmp_path / "out"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"twriteserr > {out} 2>&1")
+    assert sorted(out.read_text().splitlines()) == ["err", "out"]
+
+
+def test_ampersand_redirect_both_streams(tmp_path, make_headless_shell, p1_builtins):
+    out = tmp_path / "out"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"twriteserr &> {out}")
+    assert sorted(out.read_text().splitlines()) == ["err", "out"]
+
+
+def test_stderr_to_stdout_in_pipeline(tmp_path, make_headless_shell, p1_builtins):
+    out = tmp_path / "out"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"twriteserr 2>&1 | tcat > {out}")
+    assert sorted(out.read_text().splitlines()) == ["err", "out"]
+
+
+def test_external_stderr_redirect(tmp_path, make_headless_shell, p1_builtins, capfd):
+    err = tmp_path / "err"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"/bin/ls /nonexistent-dir-xyz 2> {err}")
+    assert shell.context.last_exit_code != 0
+    assert "nonexistent" in err.read_text().lower()
+    assert capfd.readouterr().err == ""
+
+
+def test_tilde_reaches_command(tmp_path, make_headless_shell, p1_builtins, monkeypatch, capfd):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("techo ~/x")
+    assert capfd.readouterr().out == f"{tmp_path}/x\n"

@@ -510,6 +510,9 @@ class Shell:
                 stdin_file = cmd_info["stdin_file"]
                 stdout_file = cmd_info["stdout_file"]
                 append = cmd_info.get("append", False)
+                stderr_file = cmd_info.get("stderr_file")
+                stderr_append = cmd_info.get("stderr_append", False)
+                stderr_to_stdout = cmd_info.get("stderr_to_stdout", False)
 
                 is_last = i == len(pipeline) - 1
                 current_stdin = prev_pipe_read if i > 0 else None
@@ -537,6 +540,17 @@ class Shell:
                         pipe_read = None
                     current_stdout = fd_out
 
+                current_stderr = None
+                if stderr_file:
+                    flags = os.O_WRONLY | os.O_CREAT | (
+                        os.O_APPEND if stderr_append else os.O_TRUNC
+                    )
+                    current_stderr = os.open(stderr_file, flags, 0o644)
+                elif stderr_to_stdout and current_stdout is not None:
+                    # `2>&1` / `&>`: stderr shares stdout's destination. When
+                    # stdout is the terminal there is nothing to duplicate.
+                    current_stderr = os.dup(current_stdout)
+
                 command = self.commands.get(cmd_name)
 
                 if command and len(pipeline) == 1:
@@ -544,16 +558,17 @@ class Shell:
                     # for `main_thread_only` commands and avoids a thread
                     # round-trip for the common `cd`/`set`/... case.
                     exit_code = self.executor.run_builtin_inline(
-                        command, args, current_stdin, current_stdout
+                        command, args, current_stdin, current_stdout, current_stderr
                     )
                     safe_close(current_stdout)
                     safe_close(current_stdin)
+                    safe_close(current_stderr)
                     self.context.last_exit_code = exit_code
                     return exit_code
 
                 if command:
                     thread = self.executor.execute_builtin(
-                        command, args, current_stdin, current_stdout
+                        command, args, current_stdin, current_stdout, current_stderr
                     )
                     processes.append(thread)
                 else:
@@ -563,6 +578,7 @@ class Shell:
                         current_stdin,
                         current_stdout,
                         pgid=pgid,
+                        stderr_fd=current_stderr,
                     )
 
                     if pgid is None:
@@ -573,6 +589,7 @@ class Shell:
 
                 safe_close(current_stdout)
                 safe_close(current_stdin)
+                safe_close(current_stderr)
                 prev_pipe_read = pipe_read
 
             # Only hand the terminal to the foreground process group; for

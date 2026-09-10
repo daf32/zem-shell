@@ -40,6 +40,10 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- Parser: `~`, `~/path`, `~user/path` expansion (unquoted, also in
+  redirect targets); stderr redirections `2>`, `2>>`, `2>&1`, `&>`, `&>>`.
+  A missing redirect target is now a parse error instead of being
+  silently ignored.
 - `BaseCommand.execute` may declare `stderr=`; `_write_err()` helper.
 - `ExecutionContext.set_var/unset_var/export_var/unexport_var/child_env`.
 - `ax --version` / `ax -V` prints the installed version.

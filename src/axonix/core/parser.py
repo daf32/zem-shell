@@ -1,3 +1,4 @@
+import os
 import re
 from typing import TYPE_CHECKING
 
@@ -195,31 +196,48 @@ class Parser:
                     self.config.operators.redirect_output,
                     self.config.operators.redirect_input,
                 ):
+                    # `2>` / `1>`: a bare fd number glued to `>` is an fd
+                    # prefix (bash: `echo 2>x` redirects, `echo 2 >x` prints).
+                    fd_prefix = ""
+                    if (
+                        ch == self.config.operators.redirect_output
+                        and in_token
+                        and "".join(current) in ("1", "2")
+                    ):
+                        fd_prefix = "".join(current)
+                        current, in_token = [], False
                     if in_token:
                         tokens.append("".join(current))
                         current, in_token = [], False
-                    
-                    # Handle multi-char operators (like >>)
-                    can_match_append = (
-                        ch == self.config.operators.redirect_output and 
-                        self.config.operators.redirect_append.startswith(ch)
-                    )
-                    
-                    if can_match_append:
+
+                    op = ch
+                    if ch == self.config.operators.redirect_output:
                         rem = self.config.operators.redirect_append[1:]
-                        if text[i+1:i+1+len(rem)] == rem:
-                            tokens.append(self.config.operators.redirect_append)
+                        if text[i + 1:i + 1 + len(rem)] == rem:
+                            op = self.config.operators.redirect_append
                             i += len(rem)
-                        else:
-                            tokens.append(ch)
-                    else:
-                        tokens.append(ch)
+                        elif fd_prefix == "2" and text[i + 1:i + 3] == "&1":
+                            op = "2>&1"
+                            i += 2
+                            fd_prefix = ""
+                    if fd_prefix == "2":
+                        op = "2" + op
+                    tokens.append(op)
                 elif ch == self.config.operators.background:
-                    # Background operator - should be at end of command
                     if in_token:
                         tokens.append("".join(current))
                         current, in_token = [], False
-                    tokens.append(self.config.operators.background)
+                    # `&>` / `&>>`: redirect both stdout and stderr.
+                    if text[i + 1:i + 2] == self.config.operators.redirect_output:
+                        if text[i + 1:i + 3] == self.config.operators.redirect_append:
+                            tokens.append("&>>")
+                            i += 2
+                        else:
+                            tokens.append("&>")
+                            i += 1
+                    else:
+                        # Background operator - should be at end of command
+                        tokens.append(self.config.operators.background)
                 else:
                     current.append(ch)
                     in_token = True
@@ -246,39 +264,60 @@ class Parser:
             tokens.append("".join(current))
         return tokens
     
-    def _extract_redirections(self, tokens: list[str]):
-        """Extract redirection and background information from tokens."""
-        cmd_tokens = []
-        stdin_file = None
-        stdout_file = None
-        append = False
-        background = False
-        
+    def _extract_redirections(self, tokens: list[str]) -> tuple[list[str], dict]:
+        """Split tokens into command words and a redirection spec.
+
+        The spec has keys ``stdin_file``, ``stdout_file``, ``append``,
+        ``stderr_file``, ``stderr_append``, ``stderr_to_stdout`` and
+        ``background``.
+        """
+        out = self.config.operators.redirect_output
+        app = self.config.operators.redirect_append
+        cmd_tokens: list[str] = []
+        spec: dict = {
+            "stdin_file": None,
+            "stdout_file": None,
+            "append": False,
+            "stderr_file": None,
+            "stderr_append": False,
+            "stderr_to_stdout": False,
+            "background": False,
+        }
+
+        def target(i: int, op: str) -> str:
+            if i + 1 >= len(tokens):
+                raise ParseError(f"Missing target after '{op}'")
+            return tokens[i + 1]
+
         i = 0
         while i < len(tokens):
             token = tokens[i]
-            if token in (
-                self.config.operators.redirect_output,
-                self.config.operators.redirect_append,
-            ):
-                if i + 1 < len(tokens):
-                    stdout_file = tokens[i + 1]
-                    append = (token == self.config.operators.redirect_append)
-                    i += 2
-                    continue
-            elif token == self.config.operators.redirect_input:
-                if i + 1 < len(tokens):
-                    stdin_file = tokens[i + 1]
-                    i += 2
-                    continue
-            elif token == self.config.operators.background:
-                # Background operator should be at the end
-                background = True
+            if token in (out, app):
+                spec["stdout_file"] = target(i, token)
+                spec["append"] = token == app
+                i += 2
+            elif token in ("2" + out, "2" + app):
+                spec["stderr_file"] = target(i, token)
+                spec["stderr_append"] = token == "2" + app
+                i += 2
+            elif token in ("&>", "&>>"):
+                spec["stdout_file"] = target(i, token)
+                spec["append"] = token == "&>>"
+                spec["stderr_to_stdout"] = True
+                i += 2
+            elif token == "2>&1":
+                spec["stderr_to_stdout"] = True
                 i += 1
-                continue
-            cmd_tokens.append(token)
-            i += 1
-        return cmd_tokens, stdin_file, stdout_file, append, background
+            elif token == self.config.operators.redirect_input:
+                spec["stdin_file"] = target(i, token)
+                i += 2
+            elif token == self.config.operators.background:
+                spec["background"] = True
+                i += 1
+            else:
+                cmd_tokens.append(token)
+                i += 1
+        return cmd_tokens, spec
 
     def _split_logic(self, text: str) -> list[tuple[str, str]]:
         """Split text by logic operators (&&, ||, ;) into segments."""
@@ -361,13 +400,37 @@ class Parser:
                 
         return "".join(result)
 
-    def _expand_globs(self, tokens: list[str]) -> list[str]:
-        """Expand tokens containing globs if they match files."""
+    def _expand_tilde(self, token: str) -> str | None:
+        """Expand a leading unquoted ``~`` / ``~user`` in a raw token.
+
+        Returns the expanded (and unquoted) word, or ``None`` if the token
+        doesn't start with a tilde. Only the prefix up to the first ``/``
+        is expanded; the rest of the word is unquoted as usual.
+        """
+        if not token.startswith("~"):
+            return None
+        head, sep, rest = token.partition("/")
+        expanded = os.path.expanduser(head)
+        if expanded == head:  # unknown user: leave the word alone
+            return None
+        return expanded + sep + self._remove_quotes(rest)
+
+    def _expand_word(self, token: str) -> str:
+        """Unquote a single word, expanding a leading tilde."""
+        return self._expand_tilde(token) or self._remove_quotes(token)
+
+    def _expand_words(self, tokens: list[str]) -> list[str]:
+        """Unquote words, expanding tildes and globs."""
         import glob
-        
+
         expanded_tokens = []
-        
+
         for token in tokens:
+            tilde = self._expand_tilde(token)
+            if tilde is not None:
+                token, remove = tilde, False
+            else:
+                remove = True
             # Check if token contains unquoted wildcards
             # We need to scan the token similar to _tokenize or _remove_quotes
             # but detecting if *?[ are unquoted
@@ -378,7 +441,7 @@ class Parser:
             
             # Simple heuristic first: if no globs chars, skip expensive parse
             if not any(c in token for c in "*?[]"):
-                expanded_tokens.append(self._remove_quotes(token))
+                expanded_tokens.append(self._remove_quotes(token) if remove else token)
                 continue
             
             # Verify if wildcards are unquoted
@@ -406,17 +469,12 @@ class Parser:
                         state = self.NORMAL
             
             if has_glob:
-                pattern = self._remove_quotes(token)
+                pattern = self._remove_quotes(token) if remove else token
                 matches = glob.glob(pattern)
-                
-                if matches:
-                    expanded_tokens.extend(sorted(matches))
-                else:
-
-                    expanded_tokens.append(pattern)
+                expanded_tokens.extend(sorted(matches) if matches else [pattern])
             else:
-                expanded_tokens.append(self._remove_quotes(token))
-                
+                expanded_tokens.append(self._remove_quotes(token) if remove else token)
+
         return expanded_tokens
 
     def parse(self) -> list[dict]:
@@ -446,28 +504,20 @@ class Parser:
                 toks = self._tokenize(pipe_seg)
                 toks = self._expand_aliases(toks)
                 if toks:
-                    args_raw, stdin, stdout, append, background = self._extract_redirections(toks)
-                    
+                    args_raw, spec = self._extract_redirections(toks)
+
                     if not args_raw:
                         raise ParseError("Missing command name")
-                    
-                    final_args = self._expand_globs(args_raw)
-                    
-                    if stdin:
-                        stdin = self._remove_quotes(stdin)
-                    if stdout:
-                        stdout = self._remove_quotes(stdout)
-                    
+
+                    final_args = self._expand_words(args_raw)
+                    for key in ("stdin_file", "stdout_file", "stderr_file"):
+                        if spec[key]:
+                            spec[key] = self._expand_word(spec[key])
+
                     is_last = len(commands) == len(pipeline_segments) - 1
-                    
-                    commands.append({
-                        "name": final_args[0],
-                        "args": final_args[1:],
-                        "stdin_file": stdin,
-                        "stdout_file": stdout,
-                        "append": append,
-                        "background": background and is_last
-                    })
+                    spec["background"] = spec["background"] and is_last
+
+                    commands.append({"name": final_args[0], "args": final_args[1:], **spec})
             
             if commands:
                 units.append({
