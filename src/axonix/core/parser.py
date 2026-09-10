@@ -560,15 +560,29 @@ class Parser:
             "logic": "&&" | "||" | ";" | None (operator to evaluate AFTER this pipeline)
         }
         """
+        units = list(self.iter_units())
+        if not units:
+            raise ParseError("Empty command")
+        return units
+
+    def iter_units(self):
+        """Yield logical units one at a time, tokenizing lazily.
+
+        Expansion of a unit (`$?`, `$(...)`, globs) happens only when the
+        previous unit has been consumed, so `false; echo $?` sees the
+        status of `false` — the shell executes each unit before pulling
+        the next one. Syntax errors in later units surface only when
+        reached, like in an interactive bash.
+        """
         logic_segments = self._split_logic(self.text)
-        units = []
-        
+        produced = 0
+
         for segment_text, logic_op in logic_segments:
             if not segment_text.strip() and logic_op:
-                if not units:
+                if not produced:
                     continue
                 raise ParseError(f"Empty command near {logic_op}")
-            
+
             if not segment_text.strip():
                 continue
 
@@ -606,11 +620,8 @@ class Parser:
                     commands.append({"name": final_args[0], "args": final_args[1:], **spec})
             
             if commands:
-                units.append({
-                    "pipeline": commands,
-                    "logic": logic_op
-                })
-        
-        if not units:
+                produced += 1
+                yield {"pipeline": commands, "logic": logic_op}
+
+        if not produced:
             raise ParseError("Empty command")
-        return units

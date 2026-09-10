@@ -85,6 +85,9 @@ All notable changes to Axonix are documented here. The format follows
 - Test fixtures: `full_shell` (real builtin registry, headless) and `run()`.
 
 ### Fixed
+- `false; echo $?` printed the status of the *previous line*: the whole
+  line was expanded before anything ran. Units are now expanded lazily,
+  right before they execute.
 - Path completion for arguments never worked (`ls som<TAB>`, `cd sr<TAB>`):
   the whole line was handed to the path completer as the path.
 - Commands whose argument completer had nothing to offer (`git add <TAB>`)

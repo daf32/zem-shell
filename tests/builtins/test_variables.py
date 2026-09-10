@@ -140,3 +140,7 @@ def test_child_process_sees_exported_not_local(tmp_path, full_shell, run):
     env = out.read_text()
     assert "AX_E=2" in env
     assert "AX_L=1" not in env
+
+
+def test_question_mark_updates_between_units(full_shell, run):
+    assert run(full_shell, "false; echo $?; true; echo $?") == (0, "1\n0\n", "")

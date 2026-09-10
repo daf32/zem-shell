@@ -556,8 +556,7 @@ class Shell:
             self._add_history(user_input)
 
         try:
-            units = self._parse(user_input)
-            self._execute_units(units)
+            self._execute_units(self._parser(user_input).iter_units())
         except CLIError as e:
             self.context.last_exit_code = getattr(e, "exit_code", 1)
             self._print_error(str(e))
@@ -567,23 +566,34 @@ class Shell:
 
 
 
-    def _parse(self, text: str) -> list[dict]:
+    def _parser(self, text: str) -> Parser:
         return Parser(
             text,
             self.context.variables,
             self.context.aliases,
             self.config,
             substitutor=self._capture_output,
-        ).parse()
+        )
 
-    def _execute_units(self, units: list[dict], *, final_stdout_fd: int | None = None) -> int:
+    def _execute_units(
+        self,
+        units,
+        *,
+        final_stdout_fd: int | None = None,
+        forbid_background: bool = False,
+    ) -> int:
         """Run parsed units honouring `&&`, `||`, `;`. Returns the last exit code.
 
-        ``final_stdout_fd`` redirects the stdout of every pipeline's last
-        stage (used by command substitution).
+        ``units`` may be a lazy iterator (see `Parser.iter_units`): each
+        unit is expanded right before it runs, so `$?` reflects the
+        previous unit on the same line. ``final_stdout_fd`` redirects the
+        stdout of every pipeline's last stage (used by command
+        substitution).
         """
         last_exit_code = 0
         for unit in units:
+            if forbid_background and unit["pipeline"][-1].get("background"):
+                raise ParseError("Background jobs are not allowed inside $(...)")
             last_exit_code = self._execute_pipeline(
                 unit["pipeline"], final_stdout_fd=final_stdout_fd
             )
@@ -606,10 +616,7 @@ class Shell:
         the synchronous wait in `_execute_pipeline`. The last exit code is
         restored afterwards, so `$?` reflects the enclosing command.
         """
-        units = self._parse(text)
-        for unit in units:
-            if unit["pipeline"][-1].get("background"):
-                raise ParseError("Background jobs are not allowed inside $(...)")
+        units = self._parser(text).iter_units()
 
         read_fd, write_fd = os.pipe()
         chunks: list[bytes] = []
@@ -623,7 +630,7 @@ class Shell:
 
         saved_exit_code = self.context.last_exit_code
         try:
-            self._execute_units(units, final_stdout_fd=write_fd)
+            self._execute_units(units, final_stdout_fd=write_fd, forbid_background=True)
         finally:
             os.close(write_fd)
             reader_thread.join()

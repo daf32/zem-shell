@@ -450,3 +450,36 @@ def test_background_inside_substitution_is_rejected(make_headless_shell, p4_buil
     shell._execute_line("techo $(/bin/sleep 1 &)")
     assert shell.context.last_exit_code == 1
     assert "not allowed" in capfd.readouterr().err
+
+
+# --------------------------------------------------------------------------
+# Lazy unit expansion: `$?` within one line
+# --------------------------------------------------------------------------
+
+def test_exit_status_visible_later_on_same_line(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("tfail; techo code=$?")
+    assert capfd.readouterr().out == "code=7\n"
+
+
+def test_substitution_runs_when_its_unit_is_reached(make_headless_shell, p1_builtins, capfd):
+    # The second unit's $(...) must see the variable set by the first.
+    shell = make_headless_shell(commands=p1_builtins)
+    shell.commands["tset"] = shell.commands["techo"]  # placeholder to keep map non-empty
+    shell.context.set_var("LATE", "before")
+    shell._execute_line("techo $LATE; techo $(techo after)")
+    assert capfd.readouterr().out == "before\nafter\n"
+
+
+def test_later_syntax_error_reached_only_after_earlier_units_run(
+    make_headless_shell, p1_builtins, capfd
+):
+    # An unclosed quote still rejects the whole line (bash would ask for
+    # more input), but a unit-local error such as a missing redirect
+    # target only surfaces when that unit is reached.
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("techo ran; techo >")
+    captured = capfd.readouterr()
+    assert captured.out == "ran\n"
+    assert "Missing target" in captured.err
+    assert shell.context.last_exit_code != 0
