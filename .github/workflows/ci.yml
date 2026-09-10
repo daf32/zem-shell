@@ -4,10 +4,33 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
+  lint:
+    name: Lint & type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --group dev
+      - name: Ruff
+        run: uv run ruff check . --output-format github
+      - name: Mypy (baseline, non-blocking)
+        run: uv run mypy
+        continue-on-error: true
+
   test:
-    name: ${{ matrix.os }}
+    name: Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -18,12 +41,35 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install
-        run: uv sync --group dev
-      - name: Lint
-        run: uv run ruff check .
-      - name: Type check (baseline, non-blocking)
-        run: uv run mypy
-        continue-on-error: true
-      - name: Test
-        run: uv run pytest -q
+      - run: uv sync --group dev
+      - name: Pytest
+        run: uv run pytest -q --junitxml=junit-${{ matrix.os }}.xml
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.os }}
+          path: junit-${{ matrix.os }}.xml
+          retention-days: 7
+
+  build:
+    name: Build package
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Build sdist and wheel
+        run: uv build
+      - name: Check metadata
+        run: uvx twine check dist/*
+      - name: Smoke-test the wheel in a clean venv
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          /tmp/smoke/bin/zem --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
