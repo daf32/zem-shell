@@ -1,0 +1,96 @@
+name: Version bump
+
+# Runs when a PR is merged into main. The *branch name* of the PR decides
+# the release:
+#
+#   patch/...  -> 1.2.3 -> 1.2.4
+#   minor/...  -> 1.2.3 -> 1.3.0
+#   major/...  -> 1.2.3 -> 2.0.0
+#   anything else (ci/, docs/, chore/, dependabot/...) -> no release
+#
+# It bumps [project] version in pyproject.toml, refreshes uv.lock, turns
+# the CHANGELOG "Unreleased" section into the new version, commits that
+# to main, tags vX.Y.Z and starts release.yml for the tag (a tag pushed
+# with GITHUB_TOKEN does not trigger workflows by itself).
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide the bump from the branch name
+        id: kind
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          case "$HEAD_REF" in
+            patch/*) kind=patch ;;
+            minor/*) kind=minor ;;
+            major/*) kind=major ;;
+            *)       kind=none ;;
+          esac
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "branch '$HEAD_REF' -> bump: $kind"
+
+      - uses: actions/checkout@v4
+        if: steps.kind.outputs.kind != 'none'
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        if: steps.kind.outputs.kind != 'none'
+
+      - name: Bump version, lock file and CHANGELOG
+        if: steps.kind.outputs.kind != 'none'
+        id: bump
+        run: |
+          uv version --bump "${{ steps.kind.outputs.kind }}" --no-sync
+          version="$(uv version --short)"
+          uv lock
+          today="$(date -u +%F)"
+          # "## [Unreleased]" -> fresh empty Unreleased + this version's section
+          python3 - "$version" "$today" <<'PY'
+          import re, sys, pathlib
+          version, today = sys.argv[1:3]
+          p = pathlib.Path("CHANGELOG.md")
+          text = p.read_text()
+          new = f"## [Unreleased]\n\n## [{version}] - {today}"
+          text, n = re.subn(r"^## \[Unreleased\]\s*$", new, text, count=1, flags=re.M)
+          if not n:
+              sys.exit("CHANGELOG.md has no '## [Unreleased]' section")
+          p.write_text(text)
+          PY
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Commit, tag and push
+        if: steps.kind.outputs.kind != 'none'
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml uv.lock CHANGELOG.md
+          git commit -m "chore(release): v$VERSION"
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin main "v$VERSION"
+
+      - name: Start the release workflow for the tag
+        if: steps.kind.outputs.kind != 'none'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+        run: gh workflow run release.yml --ref "v$VERSION"

@@ -168,3 +168,20 @@ See `docs/COMMAND_DEVELOPMENT.md` for the full API (exit codes, streams, variabl
 completion, plugin config). User plugins go in `~/.zem/plugins/`.
 
 Run the tests with `uv run pytest`; lint with `uv run ruff check .`.
+
+### Releasing
+
+Releases are cut automatically from the **branch name** of the merged PR:
+
+| branch prefix | bump | example |
+|---|---|---|
+| `patch/...` | patch | 1.2.3 → 1.2.4 |
+| `minor/...` | minor | 1.2.3 → 1.3.0 |
+| `major/...` | major | 1.2.3 → 2.0.0 |
+| anything else | none | no release |
+
+On merge, `version-bump.yml` updates `pyproject.toml`, `uv.lock` and the
+`Unreleased` section of `CHANGELOG.md`, commits `chore(release): vX.Y.Z` to
+`main`, tags it and runs `release.yml`, which publishes to PyPI and creates the
+GitHub Release. Put user-visible changes under **Unreleased** in the CHANGELOG
+while working on the PR.

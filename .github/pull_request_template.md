@@ -6,6 +6,10 @@
 
 <!-- Risky spots, follow-ups, anything deliberately left out. -->
 
+## Release
+
+<!-- Branch name decides the release on merge: patch/... minor/... major/... — anything else = no release. -->
+
 ## Checklist
 
 - [ ] `uv run pytest` passes locally
