@@ -1,9 +1,10 @@
 name: Release
 
-# Tag a commit on main as vX.Y.Z (matching [project] version in
-# pyproject.toml) and push the tag. This builds the package, publishes
-# it to PyPI via trusted publishing, and creates a GitHub Release with
-# the artifacts and the matching CHANGELOG section.
+# Normally started by version-bump.yml after a patch/minor/major branch
+# is merged (it creates the vX.Y.Z tag and dispatches this workflow on
+# it). Pushing a tag by hand works too. Builds the package, publishes it
+# to PyPI via trusted publishing, and creates a GitHub Release with the
+# artifacts and the matching CHANGELOG section.
 #
 # One-time setup on PyPI: add a "trusted publisher" for this repository
 # (owner daf32, repo zem-shell, workflow release.yml, environment pypi).
@@ -11,6 +12,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:  # run on a tag ref: `gh workflow run release.yml --ref vX.Y.Z`
 
 permissions:
   contents: read
