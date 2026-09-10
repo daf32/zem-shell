@@ -80,8 +80,6 @@ class Shell:
             self._setup_prompt_session()
             self._setup_signal_handlers()
 
-        self._migrate_legacy_user_files()
-
         if self.config.rc.auto_create and not os.path.exists(self.rc_file):
             self._create_default_rc()
 
@@ -134,21 +132,6 @@ class Shell:
                 self.config.plugins = plugins_config
             except Exception as e:
                 print(f"Warning: Failed to sync plugin configs: {e}")
-
-    def _migrate_legacy_user_files(self):
-        """Adopt files from the pre-rename layout (Axonix) if ours don't exist."""
-        home = os.path.expanduser("~")
-        pairs = [
-            (os.path.join(home, ".axonixrc"), self.rc_file),
-            (os.path.join(home, ".axonix_history"), self.history_file),
-            (os.path.join(home, ".axonix"), os.path.join(home, ".zem")),
-        ]
-        for old, new in pairs:
-            if os.path.exists(old) and not os.path.exists(new):
-                try:
-                    os.rename(old, new)
-                except OSError:
-                    pass
 
     def _create_default_rc(self):
         current_dir = os.path.dirname(os.path.abspath(__file__))

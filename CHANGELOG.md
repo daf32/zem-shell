@@ -6,6 +6,10 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 
+### Removed
+- Automatic migration of files from the pre-rename layout
+  (`~/.config/axonix`, `~/.axonixrc`, `~/.axonix_history`, `~/.axonix/`).
+
 ## [0.9.11] - 2026-09-10
 ### Changed
 - Python 3.10+ is supported (was 3.13+). `pip install zem` now works on
