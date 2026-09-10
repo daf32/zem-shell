@@ -171,18 +171,14 @@ def _ensure_config_file(path: str) -> None:
     except OSError:
         return
 
-    xdg_home = os.getenv("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
-    for legacy in (
-        os.path.join(xdg_home, "axonix", "config.json"),  # pre-rename (Axonix)
-        _legacy_config_path(),
-    ):
-        if legacy != path and os.path.isfile(legacy):
-            try:
-                import shutil
-                shutil.move(legacy, path)
-                return
-            except OSError:
-                pass
+    legacy = _legacy_config_path()
+    if legacy != path and os.path.isfile(legacy):
+        try:
+            import shutil
+            shutil.move(legacy, path)
+            return
+        except OSError:
+            pass
 
     import json
     # Build the defaults *before* touching ``path``: ``AppConfig()`` reads
