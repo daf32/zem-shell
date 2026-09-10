@@ -1,5 +1,6 @@
 import logging as _logging
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 # Default to a NullHandler so library use doesn't emit "No handlers found"
 # warnings; `main.main()` opts into stderr output via `AXONIX_LOG_ENABLED`.

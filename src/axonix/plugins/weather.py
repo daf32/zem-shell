@@ -1,15 +1,18 @@
 """Weather plugin using Open-Meteo API."""
 import json
-import urllib.request
 import urllib.parse
-from axonix.builtins.base import BaseCommand
-from axonix.ui.completers.base import BaseArgCompleter
-from prompt_toolkit.completion import Completion
+import urllib.request
 from typing import TYPE_CHECKING, Iterable, List
 
+from prompt_toolkit.completion import Completion
+
+from axonix.builtins.base import BaseCommand
+from axonix.ui.completers.base import BaseArgCompleter
+
 if TYPE_CHECKING:
-    from axonix.core.context import ExecutionContext
     from prompt_toolkit.document import Document
+
+    from axonix.core.context import ExecutionContext
 
 class WeatherCompleter(BaseArgCompleter):
     """Suggests cities from a predefined list or history."""
@@ -20,7 +23,9 @@ class WeatherCompleter(BaseArgCompleter):
         "Toronto", "Sydney", "Mumbai", "Beijing", "San Francisco"
     ]
 
-    def get_completions(self, document: "Document", parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: "Document", parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         # weather [CITY]
         if len(parts) >= 1:
             for city in self.CITIES:
@@ -87,7 +92,9 @@ class WeatherCommand(BaseCommand):
             self._write(f"❌ Error: {e}\n", stdout)
 
     def _get_coordinates(self, city: str):
-        params = urllib.parse.urlencode({"name": city, "count": 1, "language": "en", "format": "json"})
+        params = urllib.parse.urlencode(
+            {"name": city, "count": 1, "language": "en", "format": "json"}
+        )
         url = f"{self.GEO_URL}?{params}"
         
         with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response:
@@ -97,10 +104,13 @@ class WeatherCommand(BaseCommand):
             raise ValueError(f"City '{city}' not found.")
             
         result = data["results"][0]
-        return result["latitude"], result["longitude"], f"{result['name']}, {result.get('country', '')}"
+        label = f"{result['name']}, {result.get('country', '')}"
+        return result["latitude"], result["longitude"], label
 
     def _get_weather(self, lat, lon):
-        params = urllib.parse.urlencode({"latitude": lat, "longitude": lon, "current_weather": "true"})
+        params = urllib.parse.urlencode(
+            {"latitude": lat, "longitude": lon, "current_weather": "true"}
+        )
         url = f"{self.API_URL}?{params}"
         
         with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response:
@@ -108,12 +118,20 @@ class WeatherCommand(BaseCommand):
 
     def _get_weather_icon(self, code):
         # WMO Weather interpretation codes (WW)
-        if code == 0: return "☀️"
-        if code in [1, 2, 3]: return "⛅"
-        if code in [45, 48]: return "🌫"
-        if code in [51, 53, 55]: return "zz☔"
-        if code in [61, 63, 65]: return "☔"
-        if code in [80, 81, 82]: return "🌧"
-        if code in [95, 96, 99]: return "⛈"
-        if code in [71, 73, 75]: return "❄️"
+        if code == 0:
+            return "☀️"
+        if code in [1, 2, 3]:
+            return "⛅"
+        if code in [45, 48]:
+            return "🌫"
+        if code in [51, 53, 55]:
+            return "zz☔"
+        if code in [61, 63, 65]:
+            return "☔"
+        if code in [80, 81, 82]:
+            return "🌧"
+        if code in [95, 96, 99]:
+            return "⛈"
+        if code in [71, 73, 75]:
+            return "❄️"
         return "❓"

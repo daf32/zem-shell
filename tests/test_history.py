@@ -1,5 +1,5 @@
-from axonix.core.shell import Shell
 from axonix.config.settings import AppConfig
+from axonix.core.shell import Shell
 
 
 def _shell_with_history_limit(tmp_path, limit: int) -> Shell:

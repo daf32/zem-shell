@@ -1,32 +1,28 @@
-from axonix.core.context import ExecutionContext
-from axonix.core.parser import Parser
-from axonix.core.executor import CommandExecutor
-
-from axonix.builtins import DEFAULT_USER_PLUGINS_DIR, load_plugins
-from axonix.builtins.base import BaseCommand
-from axonix.builtins.registry import CommandRegistry
-
-from axonix.config.settings import AppConfig
-
-from axonix.errors.base_error import CLIError
-
-from typing import Dict, Optional
 import os
 import signal
 import subprocess
 import sys
+import termios
 import threading
 import time
 from datetime import datetime
-import termios
+from typing import Dict, Optional
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
-from axonix.ui.lexer import AxonixLexer
+from axonix.builtins import DEFAULT_USER_PLUGINS_DIR, load_plugins
+from axonix.builtins.base import BaseCommand
+from axonix.builtins.registry import CommandRegistry
+from axonix.config.settings import AppConfig
+from axonix.core.context import ExecutionContext
+from axonix.core.executor import CommandExecutor
+from axonix.core.parser import Parser
+from axonix.errors.base_error import CLIError
 from axonix.ui.completer import AxonixCompleter
-from axonix.utils.git import get_git_info, format_git_branch
+from axonix.ui.lexer import AxonixLexer
+from axonix.utils.git import format_git_branch, get_git_info
 from axonix.utils.venv import activate_venv, get_venv_info
 
 
@@ -107,8 +103,9 @@ class Shell:
 
     def _sync_plugin_configs(self):
         """Sync default plugin configurations to the config file."""
-        from axonix.config.settings import CONFIG_PATH
         import json
+
+        from axonix.config.settings import CONFIG_PATH
         
         updated = False
         plugins_config = self.config.plugins.copy()
@@ -319,7 +316,9 @@ class Shell:
         """Add ~ prefix if path doesn't start with it."""
         return path if path.startswith("~") else f"~ {path}"
 
-    def _build_colored_prompt(self, venv_info: str | None, path: str, git_info: str, exit_code: int) -> list:
+    def _build_colored_prompt(
+        self, venv_info: str | None, path: str, git_info: str, exit_code: int
+    ) -> list:
         """Build colored prompt components."""
         code_class = 'exit_code_ok' if exit_code == 0 else 'exit_code_err'
         path_display = self._format_path_display(path)
@@ -344,7 +343,9 @@ class Shell:
         ])
         return prompt_parts
 
-    def _build_text_prompt(self, venv_info: str | None, path: str, git_info: str, exit_code: int) -> str:
+    def _build_text_prompt(
+        self, venv_info: str | None, path: str, git_info: str, exit_code: int
+    ) -> str:
         """Build text-only prompt."""
         prompt_text = f"{exit_code} " if self.config.input.show_exit_code else ""
         path_display = self._format_path_display(path)
@@ -396,12 +397,17 @@ class Shell:
                 branch, status = git_info
                 git_display = f" ({format_git_branch(branch, status)})"
 
-        venv_display = get_venv_info() if getattr(self.config.input, "show_venv_info", False) else None
+        show_venv = getattr(self.config.input, "show_venv_info", False)
+        venv_display = get_venv_info() if show_venv else None
 
         if self.config.input.color_prompt:
-            prompt_html = self._build_colored_prompt(venv_display, display_path, git_display, exit_code)
+            prompt_html = self._build_colored_prompt(
+                venv_display, display_path, git_display, exit_code
+            )
         else:
-            prompt_html = self._build_text_prompt(venv_display, display_path, git_display, exit_code)
+            prompt_html = self._build_text_prompt(
+                venv_display, display_path, git_display, exit_code
+            )
 
         # Build right prompt
         rprompt = self._get_rprompt() if self.config.input.rprompt else None
@@ -409,7 +415,8 @@ class Shell:
         return self.session.prompt(prompt_html, rprompt=rprompt)
 
     def _print_error(self, message: str):
-        from prompt_toolkit import print_formatted_text, HTML
+        from prompt_toolkit import HTML, print_formatted_text
+
         from axonix.utils.colors import error_tag
         print_formatted_text(HTML(f'{error_tag(self.config)} {message}'), file=sys.stderr)
 

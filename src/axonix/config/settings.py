@@ -1,7 +1,9 @@
 import os
 from typing import Any, Dict
+
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class OperatorsConfig(BaseModel):
     variable: str = "$"

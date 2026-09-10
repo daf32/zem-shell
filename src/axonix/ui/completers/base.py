@@ -1,13 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Iterable, List
+
 from prompt_toolkit.completion import Completion
 from prompt_toolkit.document import Document
+
 
 class BaseArgCompleter(ABC):
     """Base class for argument completers."""
     
     @abstractmethod
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         """Get completions for the current argument.
         
         Args:

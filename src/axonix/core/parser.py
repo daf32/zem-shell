@@ -1,5 +1,6 @@
 import re
 from typing import TYPE_CHECKING
+
 from axonix.errors.parser_error import ParseError, UnclosedQuoteError
 
 if TYPE_CHECKING:
@@ -185,7 +186,10 @@ class Parser:
                     name, next_i = self._get_var_name(text, i + 1)
                     current.append(str(self.variables.get(name, "")))
                     i, in_token = next_i - 1, True
-                elif ch in [self.config.operators.redirect_output, self.config.operators.redirect_input]:
+                elif ch in (
+                    self.config.operators.redirect_output,
+                    self.config.operators.redirect_input,
+                ):
                     if in_token:
                         tokens.append("".join(current))
                         current, in_token = [], False
@@ -248,7 +252,10 @@ class Parser:
         i = 0
         while i < len(tokens):
             token = tokens[i]
-            if token == self.config.operators.redirect_output or token == self.config.operators.redirect_append:
+            if token in (
+                self.config.operators.redirect_output,
+                self.config.operators.redirect_append,
+            ):
                 if i + 1 < len(tokens):
                     stdout_file = tokens[i + 1]
                     append = (token == self.config.operators.redirect_append)

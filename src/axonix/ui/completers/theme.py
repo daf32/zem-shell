@@ -1,7 +1,9 @@
-from axonix.ui.completers.base import BaseArgCompleter
-from prompt_toolkit.completion import Completion, PathCompleter, CompleteEvent
-from prompt_toolkit.document import Document
 from typing import Iterable, List
+
+from prompt_toolkit.completion import CompleteEvent, Completion, PathCompleter
+from prompt_toolkit.document import Document
+
+from axonix.ui.completers.base import BaseArgCompleter
 
 
 class ThemeCompleter(BaseArgCompleter):
@@ -30,7 +32,9 @@ class ThemeCompleter(BaseArgCompleter):
         """Invalidate the theme cache (call after theme import/install)."""
         self._cached_themes = None
 
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         """Complete theme command arguments.
         
         Args:

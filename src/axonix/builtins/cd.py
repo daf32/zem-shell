@@ -1,7 +1,8 @@
 import os
+from typing import TYPE_CHECKING
+
 from axonix.builtins.base import BaseCommand
 from axonix.errors.input_error import ArgumentError
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext
@@ -46,13 +47,13 @@ class CdCommand(BaseCommand):
             # Update PWD
             context.variables["PWD"] = os.getcwd()
         except FileNotFoundError:
-            raise ArgumentError(self.name, [target], reason="no such file or directory")
+            raise ArgumentError(self.name, [target], reason="no such file or directory") from None
         except NotADirectoryError:
-            raise ArgumentError(self.name, [target], reason="not a directory")
+            raise ArgumentError(self.name, [target], reason="not a directory") from None
         except PermissionError:
-            raise ArgumentError(self.name, [target], reason="permission denied")
+            raise ArgumentError(self.name, [target], reason="permission denied") from None
         except Exception as e:
-            raise ArgumentError(self.name, [target], reason=str(e))
+            raise ArgumentError(self.name, [target], reason=str(e)) from e
 
     def get_completer(self):
         from axonix.ui.completers.defaults import DirectoryCompleter

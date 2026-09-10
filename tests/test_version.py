@@ -9,7 +9,8 @@ import axonix
 
 def test_dunder_version_is_pep440():
     # Either the installed metadata version or the documented fallback.
-    assert re.match(r"^\d+(\.\d+)*([abc]|rc)?\d*(\.post\d+)?(\.dev\d+)?(\+\w+)?$", axonix.__version__)
+    pep440 = r"^\d+(\.\d+)*([abc]|rc)?\d*(\.post\d+)?(\.dev\d+)?(\+\w+)?$"
+    assert re.match(pep440, axonix.__version__)
 
 
 def test_cli_version_flag_prints_version():

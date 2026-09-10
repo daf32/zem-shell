@@ -54,7 +54,11 @@ extend-exclude = ["dist", ".venv"]
 # yet, so import sorting / pycodestyle are intentionally left out for
 # now. Ratchet up to ["E", "F", "I", "B"] in a follow-up PR once the
 # baseline is clean.
-select = ["F"]
+select = ["E", "F", "I", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# The launcher template embeds a long osascript one-liner in a string.
+"scripts/build_mac_app.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.13"

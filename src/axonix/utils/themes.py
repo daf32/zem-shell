@@ -1,9 +1,9 @@
 """Theme manager for Axonix Shell."""
-import os
 import json
+import os
 import re
-from typing import Dict, List, Optional, Tuple
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
 
 class ThemeValidationError(Exception):
@@ -48,7 +48,9 @@ class ThemeManager:
             return False
         return bool(self.HEX_COLOR_PATTERN.match(color))
     
-    def validate_theme(self, theme_data: dict, theme_name: str = "unknown") -> Tuple[bool, List[str]]:
+    def validate_theme(
+        self, theme_data: dict, theme_name: str = "unknown"
+    ) -> Tuple[bool, List[str]]:
         """Validate a theme's structure and colors.
         
         Returns:

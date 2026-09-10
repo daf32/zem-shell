@@ -1,9 +1,11 @@
-from axonix.ui.completers.base import BaseArgCompleter
-from prompt_toolkit.completion import PathCompleter, Completion, CompleteEvent
-from prompt_toolkit.document import Document
-from typing import Iterable, List
 import os
 import stat
+from typing import Iterable, List
+
+from prompt_toolkit.completion import CompleteEvent, Completion, PathCompleter
+from prompt_toolkit.document import Document
+
+from axonix.ui.completers.base import BaseArgCompleter
 
 
 def _text_ends_with_space(document: Document) -> bool:
@@ -52,7 +54,9 @@ def _get_file_type_info(path: str) -> str:
 class EnhancedPathCompleter(PathCompleter):
     """PathCompleter with file type metadata in completion display."""
     
-    def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, complete_event: CompleteEvent
+    ) -> Iterable[Completion]:
         """Get path completions with file type info."""
         for completion in super().get_completions(document, complete_event):
             # Get the full path for type detection
@@ -91,7 +95,9 @@ class DirectoryCompleter(BaseArgCompleter):
     def __init__(self):
         self._completer = EnhancedPathCompleter(expanduser=True, only_directories=True)
     
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         """Complete directory paths."""
         complete_event = CompleteEvent(text_inserted=False, completion_requested=True)
         return self._completer.get_completions(document, complete_event)
@@ -126,7 +132,9 @@ class GitCompleter(BaseArgCompleter):
         "tag": "Create, list, or delete tags",
     }
     
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         """Complete git subcommands with descriptions."""
         num_args = len(parts) - 1
         
@@ -170,7 +178,9 @@ class PipCompleter(BaseArgCompleter):
         "--force-reinstall": "Reinstall all packages",
     }
     
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         num_args = len(parts) - 1
         ends_with_space = _text_ends_with_space(document)
         
@@ -233,7 +243,9 @@ class DockerCompleter(BaseArgCompleter):
         "--network": "Connect to a network",
     }
     
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         num_args = len(parts) - 1
         ends_with_space = _text_ends_with_space(document)
         
@@ -300,7 +312,9 @@ class NpmCompleter(BaseArgCompleter):
         "--force": "Force reinstall",
     }
     
-    def get_completions(self, document: Document, parts: List[str], word_before: str) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, parts: List[str], word_before: str
+    ) -> Iterable[Completion]:
         num_args = len(parts) - 1
         ends_with_space = _text_ends_with_space(document)
         

@@ -1,5 +1,7 @@
 from typing import Dict
+
 from axonix.ui.completers.base import BaseArgCompleter
+
 
 class CompleterRegistry:
     """Registry for command argument completers."""

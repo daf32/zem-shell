@@ -135,6 +135,7 @@ class CommandExecutor:
         # path (where the child error can be reported as ENOENT, ENAMETOOLONG,
         # or other OSError codes depending on platform/sandbox).
         import shutil
+
         from axonix.errors.input_error import UnknownCommandError
         if "/" not in cmd_name and shutil.which(cmd_name) is None:
             raise UnknownCommandError(cmd_name)
@@ -176,7 +177,7 @@ class CommandExecutor:
                 # the generic "internal error" path used by `except Exception`
                 # in Shell._execute_line.
                 from axonix.errors.input_error import UnknownCommandError
-                raise UnknownCommandError(cmd_name)
+                raise UnknownCommandError(cmd_name) from None
 
             self._active_processes.append(process)
             return process

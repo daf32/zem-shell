@@ -1,13 +1,19 @@
-from prompt_toolkit.completion import Completer, Completion, CompleteEvent
-from prompt_toolkit.document import Document
 from typing import Iterable, List, Optional, Set
-from axonix.utils.executables import get_system_commands
-from axonix.ui.completers.registry import CompleterRegistry
+
+from prompt_toolkit.completion import CompleteEvent, Completer, Completion
+from prompt_toolkit.document import Document
+
 from axonix.ui.completers.defaults import (
-    GitCompleter, DirectoryCompleter, EnhancedPathCompleter,
-    PipCompleter, DockerCompleter, NpmCompleter
+    DirectoryCompleter,
+    DockerCompleter,
+    EnhancedPathCompleter,
+    GitCompleter,
+    NpmCompleter,
+    PipCompleter,
 )
+from axonix.ui.completers.registry import CompleterRegistry
 from axonix.ui.completers.theme import ThemeCompleter
+from axonix.utils.executables import get_system_commands
 
 
 class AxonixCompleter(Completer):
@@ -97,7 +103,9 @@ class AxonixCompleter(Completer):
         
         return last_separator_idx + 1
 
-    def get_completions(self, document: Document, complete_event: CompleteEvent) -> Iterable[Completion]:
+    def get_completions(
+        self, document: Document, complete_event: CompleteEvent
+    ) -> Iterable[Completion]:
         """Get completions for the current input."""
         text_before = document.text_before_cursor
         

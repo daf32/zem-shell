@@ -7,14 +7,12 @@ end-to-end.
 
 from __future__ import annotations
 
-
 import pytest
 
 from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
 from axonix.core.executor import CommandExecutor
 from axonix.errors.input_error import UnknownCommandError
-
 
 # --------------------------------------------------------------------------
 # Tiny test builtins. They live here so they don't get auto-registered

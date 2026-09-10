@@ -1,5 +1,6 @@
-from axonix.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
+
+from axonix.builtins.base import BaseCommand
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext
@@ -25,8 +26,9 @@ class ThemeCommand(BaseCommand):
     ):
         from prompt_toolkit import print_formatted_text
         from prompt_toolkit.formatted_text import FormattedText
-        from axonix.utils.themes import ThemeManager
+
         from axonix.config.settings import AppConfig
+        from axonix.utils.themes import ThemeManager
         
         config = AppConfig()
         manager = ThemeManager(config)
@@ -214,6 +216,6 @@ class ThemeCommand(BaseCommand):
 
     def get_completer(self):
         """Return the ThemeCompleter."""
-        from axonix.ui.completers.theme import ThemeCompleter
         from axonix.config.settings import AppConfig
+        from axonix.ui.completers.theme import ThemeCompleter
         return ThemeCompleter(AppConfig())

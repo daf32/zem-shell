@@ -1,6 +1,7 @@
+from typing import TYPE_CHECKING
+
 from axonix.builtins.base import BaseCommand
 from axonix.utils.venv import activate_venv, deactivate_venv, find_venv
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext
@@ -28,7 +29,9 @@ class VenvCommand(BaseCommand):
                 activate_venv(context)
                 self._write(f"✓ Activated venv: {venv_path}\n", stdout)
             else:
-                self._write("✗ No virtual environment found in current directory or parents\n", stdout)
+                self._write(
+                    "✗ No virtual environment found in current directory or parents\n", stdout
+                )
         
         elif subcommand == "deactivate":
             if context.active_venv:

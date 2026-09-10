@@ -1,5 +1,6 @@
 from axonix.builtins.base import BaseCommand
 
+
 class UnaliasCommand(BaseCommand):
     name = "unalias"
     help = "Remove an alias"

@@ -1,7 +1,8 @@
 import os
-import stat
 import shutil
+import stat
 from pathlib import Path
+
 
 def create_mac_app():
     project_root = Path(__file__).parent.parent.resolve()
@@ -58,25 +59,6 @@ def create_mac_app():
     # Using AppleScript here is the most robust way to interact with Terminal.app
     # We use 'do script' to launch our specific command in a new window.
     
-    launcher_script = f"""#!/bin/bash
-# Launcher for Axonix Shell
-# Determines the project directory and runs 'uv run ax' in a NEW Terminal window.
-
-PROJECT_DIR="{project_root}"
-
-# AppleScript to launch Terminal with the command
-osascript <<EOF
-tell application "Terminal"
-    activate
-    do script "cd " & check with command " & quoted form of "{project_root}" & " && uv run ax; exit"
-end tell
-EOF
-
-# Close this launcher app so it doesn't stay in the dock
-killall Axonix
-"""
-    
-    # Corrected AppleScript logic for robust path handling
     launcher_content = f"""#!/bin/bash
 PROJECT_DIR="{project_root}"
 

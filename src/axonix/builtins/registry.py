@@ -1,5 +1,6 @@
 """Command registry for managing builtin commands."""
 from typing import Dict, Optional
+
 from axonix.builtins.base import BaseCommand
 
 

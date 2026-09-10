@@ -1,9 +1,8 @@
 """
 Simple venv utility for shell
 """
-from pathlib import Path
 import os
-
+from pathlib import Path
 
 VENV_NAMES = (".venv", "venv", "env")
 

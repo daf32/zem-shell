@@ -1,10 +1,11 @@
-import os
-import sys
-import axonix.builtins as builtins
-import axonix.themes
-import axonix.plugins
 import importlib
+import os
 import pkgutil
+import sys
+
+import axonix.builtins as builtins
+import axonix.plugins
+import axonix.themes
 
 DEFAULT_USER_PLUGINS_DIR = os.path.expanduser("~/.axonix/plugins")
 

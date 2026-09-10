@@ -1,6 +1,7 @@
 import os
-from axonix.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
+
+from axonix.builtins.base import BaseCommand
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext

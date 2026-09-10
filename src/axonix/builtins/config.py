@@ -1,11 +1,13 @@
 import json
 import os
 from typing import Any, List
+
+from prompt_toolkit.completion import Completion
+from prompt_toolkit.document import Document
+
 from axonix.builtins.base import BaseCommand
 from axonix.core.context import ExecutionContext
 from axonix.ui.completers.base import BaseArgCompleter
-from prompt_toolkit.completion import Completion
-from prompt_toolkit.document import Document
 
 
 class ConfigCompleter(BaseArgCompleter):
@@ -53,7 +55,9 @@ class ConfigCompleter(BaseArgCompleter):
         if len(parts) >= 2:
             subcmd = parts[1]
             if subcmd in ["get", "set"]:
-                if (len(parts) == 2 and ends_with_space) or (len(parts) == 3 and not ends_with_space):
+                if (len(parts) == 2 and ends_with_space) or (
+                    len(parts) == 3 and not ends_with_space
+                ):
                     all_keys = self._get_keys(self.config_data)
                     current_input = parts[2] if len(parts) == 3 else ""
                     
@@ -257,7 +261,7 @@ class ConfigCommand(BaseCommand):
     def _set_value(self, data: dict, key: str, value: Any) -> bool:
         keys = key.split('.')
         curr = data
-        for i, k in enumerate(keys[:-1]):
+        for k in keys[:-1]:
             if k not in curr:
                 # Create dict if missing
                 curr[k] = {}
@@ -272,9 +276,12 @@ class ConfigCommand(BaseCommand):
 
     def _infer_type(self, value: str) -> Any:
         value_lower = value.lower()
-        if value_lower == "true": return True
-        if value_lower == "false": return False
-        if value_lower == "null": return None
+        if value_lower == "true":
+            return True
+        if value_lower == "false":
+            return False
+        if value_lower == "null":
+            return None
         try:
             return int(value)
         except ValueError:

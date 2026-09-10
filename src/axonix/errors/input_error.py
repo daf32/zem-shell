@@ -1,5 +1,6 @@
 from axonix.errors.base_error import CLIError
 
+
 class InputError(CLIError):
     def __init__(self, e):
         super().__init__(str(e))

@@ -1,13 +1,14 @@
 import pytest
 
-from axonix.core.parser import Parser
 from axonix.config.settings import AppConfig
+from axonix.core.parser import Parser
+from axonix.errors.parser_error import ParseError
 
 
 def test_pipe_requires_command():
     cfg = AppConfig()
     parser = Parser("echo hi | ", {}, {}, cfg)
-    with pytest.raises(Exception):
+    with pytest.raises(ParseError):
         parser.parse()
 
 

@@ -1,7 +1,8 @@
 import os
+from typing import TYPE_CHECKING
+
 from axonix.builtins.base import BaseCommand
 from axonix.errors.input_error import ArgumentError
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from axonix.core.context import ExecutionContext

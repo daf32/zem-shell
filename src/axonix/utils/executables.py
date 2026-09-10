@@ -1,5 +1,6 @@
 import os
 
+
 def get_system_commands():
     """Get all executable files in system PATH."""
     paths = os.environ.get("PATH", "").split(os.pathsep)

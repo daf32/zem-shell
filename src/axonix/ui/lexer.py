@@ -1,8 +1,9 @@
-from prompt_toolkit.lexers import Lexer
-from prompt_toolkit.document import Document
-from typing import List, Tuple, Callable
 import os
 import re
+from typing import Callable, List, Tuple
+
+from prompt_toolkit.document import Document
+from prompt_toolkit.lexers import Lexer
 
 
 class AxonixLexer(Lexer):
@@ -201,7 +202,10 @@ class AxonixLexer(Lexer):
                         if c == quote_type:
                             break
                         # Handle escape in double quotes
-                        if quote_type == self.config.operators.double_quote and c == self.config.operators.escape:
+                        if (
+                            quote_type == self.config.operators.double_quote
+                            and c == self.config.operators.escape
+                        ):
                             if i + 1 < len(line):
                                 i += 1
                                 string_content += line[i]

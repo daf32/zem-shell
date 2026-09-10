@@ -1,6 +1,8 @@
 """Utilities for working with colors and formatting."""
 from typing import Optional
+
 from axonix.config.settings import AppConfig
+
 
 def get_colors(config: Optional[AppConfig] = None):
     """Get the current color scheme from config."""

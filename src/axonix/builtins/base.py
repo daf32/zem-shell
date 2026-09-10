@@ -1,7 +1,7 @@
 import inspect
 import re
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING, Optional, TextIO
 
 if TYPE_CHECKING:
