@@ -18,6 +18,7 @@ from axonix.config.settings import AppConfig
 from axonix.core.context import ExecutionContext
 from axonix.core.executor import CommandExecutor
 from axonix.core.history_expand import expand_history
+from axonix.core.jobs import Job, JobState, exit_code_from, format_notice, wait_process
 from axonix.core.parser import Parser
 from axonix.core.scan import join_lines
 from axonix.errors.base_error import CLIError
@@ -323,6 +324,16 @@ class Shell:
     def _close_shell(self):
         self._restore_terminal()
 
+        # Like bash: remaining jobs get SIGHUP (and SIGCONT so stopped ones
+        # can act on it) before we tear the rest down.
+        for job in list(self.context._jobs):
+            for sig in (signal.SIGHUP, signal.SIGCONT):
+                try:
+                    os.killpg(job.pgid, sig)
+                except OSError:
+                    pass
+            self.context._jobs.remove(job)
+
         self.executor.cleanup_processes()
         self.context.running = False
         if not self.headless:
@@ -457,10 +468,67 @@ class Shell:
         from axonix.utils.colors import error_tag
         print_formatted_text(HTML(f'{error_tag(self.config)} {message}'), file=sys.stderr)
 
-    def _write_background_notice(self, pid: int):
-        """Print a bash-style `[bg] <pid>` notice for a detached pipeline."""
-        sys.stderr.write(f"[bg] {pid}\n")
+    # -- job control ---------------------------------------------------------
+
+    def _give_terminal(self, pgid: int) -> None:
+        if self.headless:
+            return
+        try:
+            os.tcsetpgrp(self._tty_fd, pgid)
+        except OSError:
+            pass
+
+    def _reclaim_terminal(self) -> None:
+        if self.headless:
+            return
+        try:
+            os.tcsetpgrp(self._tty_fd, self._shell_pgid)
+        except OSError:
+            pass
+
+    def _notify(self, line: str) -> None:
+        sys.stderr.write(line + "\n")
         sys.stderr.flush()
+
+    def _report_jobs(self) -> None:
+        """Print state changes of background jobs (called before each prompt)."""
+        for job in self.context._jobs.reap():
+            marker = "+" if self.context._jobs.current() is job else " "
+            self._notify(format_notice(job, marker))
+
+    def _wait_job(self, job: Job, *, foreground: bool = True) -> int:
+        """Block until ``job`` finishes or stops; return its exit code.
+
+        A stop (Ctrl-Z / SIGSTOP) leaves the job in the table as Stopped
+        and returns 128 + SIGTSTP like bash.
+        """
+        if foreground:
+            self._give_terminal(job.pgid)
+        try:
+            for idx, proc in enumerate(job.procs):
+                while True:
+                    state, value = wait_process(proc)
+                    if state == "stopped":
+                        job.state = JobState.STOPPED
+                        job.notified = True  # we print it right here
+                        self.context._jobs._touch(job)
+                        self._notify(format_notice(job, "+"))
+                        return exit_code_from("stopped", value)
+                    if state != "running":
+                        job._codes[idx] = exit_code_from(state, value)
+                        break
+            job.state = JobState.DONE
+            job.exit_code = job.last_code
+            self.context._jobs.remove(job)
+            return job.exit_code
+        finally:
+            if foreground:
+                self._reclaim_terminal()
+
+    @staticmethod
+    def _pipeline_text(pipeline: list[dict]) -> str:
+        import shlex
+        return " | ".join(shlex.join([c["name"], *c["args"]]) for c in pipeline)
 
     def _add_history(self, entry: str):
         """Add entry to in-memory history respecting limits and settings."""
@@ -699,66 +767,54 @@ class Shell:
                 close(current_stderr)
                 prev_pipe_read = pipe_read
 
-            # Only hand the terminal to the foreground process group; for
-            # background pipelines the shell keeps the tty so the prompt
-            # stays interactive.
-            if has_external and pgid is not None and not is_background:
-                try:
-                    os.tcsetpgrp(self._tty_fd, pgid)
-                except Exception:
-                    pass
+            procs = [p for p in processes if isinstance(p, subprocess.Popen)]
+            threads = [p for p in processes if isinstance(p, threading.Thread)]
 
-            last_proc = processes[-1] if processes else None
-            background_external = (
-                is_background
-                and isinstance(last_proc, subprocess.Popen)
-            )
-
-            if is_background and not background_external:
-                # Backgrounding a pure-builtin tail isn't honoured; warn once
+            if is_background and not has_external:
+                # Backgrounding a pure-builtin pipeline isn't honoured; warn
                 # and fall back to foreground execution to preserve correctness.
                 self._print_error(
                     "background (`&`) is only supported for external commands; "
                     "running this pipeline in the foreground"
                 )
+                is_background = False
 
-            for idx, p in enumerate(processes):
-                is_last = idx == len(processes) - 1
-                if background_external and is_last:
-                    # Detach the trailing external process; its exit will be
-                    # reaped on shell shutdown via `cleanup_processes`.
-                    self.context._background_processes.append(p)
-                    self._write_background_notice(p.pid)
+            if has_external and pgid is not None:
+                job = self.context._jobs.add(pgid, self._pipeline_text(pipeline), procs)
+                if is_background:
+                    # Detach: `[N] pid` like bash; reaped before later prompts.
+                    self._notify(f"[{job.id}] {job.pgid}")
+                    for t in threads:
+                        t.join()
                     exit_code = 0
                     self.context.last_exit_code = 0
-                    continue
+                    return exit_code
 
-                if isinstance(p, threading.Thread):
-                    p.join()
-                    if is_last:
-                        # The builtin worker thread stashes its exit code on
-                        # the Thread object (see CommandExecutor.execute_builtin).
-                        # Reading after join() is safe — the worker is done.
-                        exit_code = getattr(p, "exit_code", 0)
-                        self.context.last_exit_code = exit_code
+                # Foreground: builtin stages finish on their own; the job's
+                # exit code comes from its external stages (and wins when
+                # the external is the last stage).
+                for t in threads:
+                    t.join()
+                external_code = self._wait_job(job, foreground=True)
+                last = processes[-1]
+                if isinstance(last, threading.Thread):
+                    exit_code = getattr(last, "exit_code", 0)
                 else:
-                    exit_code = p.wait()
+                    exit_code = external_code
+                self.context.last_exit_code = exit_code
+                return exit_code
 
-                    if is_last:
-                        if exit_code < 0:
-                            exit_code = 128 + (-exit_code)
-
-                        self.context.last_exit_code = exit_code
-
+            # Builtins only.
+            for t in threads:
+                t.join()
+            if threads:
+                # The builtin worker thread stashes its exit code on the
+                # Thread object (see CommandExecutor.execute_builtin).
+                exit_code = getattr(threads[-1], "exit_code", 0)
+            self.context.last_exit_code = exit_code
             return exit_code
 
         finally:
-            if has_external and not is_background:
-                try:
-                    os.tcsetpgrp(self._tty_fd, self._shell_pgid)
-                except Exception:
-                    pass
-
             self.executor.clear_finished()
 
             # Anything still open here is a leftover from an early exit
@@ -771,6 +827,7 @@ class Shell:
         try:
             while self.context.running:
                 try:
+                    self._report_jobs()
                     try:
                         user_input = self._get_input()
 

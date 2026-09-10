@@ -17,8 +17,18 @@ class ExitCommand(BaseCommand):
     main_thread_only = True
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
+        context._jobs.reap()
+        if context._jobs.stopped() and not context._exit_warned:
+            context._exit_warned = True
+            self._write_err("There are stopped jobs.\n", stderr)
+            return 1
         if len(args) > 1:
             raise ArgumentError(self.name, args, reason="too many arguments")
         if args:

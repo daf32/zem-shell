@@ -40,6 +40,12 @@ All notable changes to Axonix are documented here. The format follows
   exits 1.
 
 ### Added
+- Job control: `&` detaches the whole pipeline as a job (`[1] pid`),
+  Ctrl-Z stops the foreground job, `jobs [-l|-p]`, `fg`, `bg`, `wait`,
+  `kill` (understands `%N`, sends SIGCONT to stopped jobs), `disown`.
+  Job specs `%N`, `%%`, `%+`, `%-`, `%prefix`, pid. Finished jobs are
+  reported before the next prompt; `exit` warns once about stopped jobs;
+  remaining jobs get SIGHUP on exit.
 - New builtins: `true`, `false`, `:`, `test`/`[` (file, string, integer
   tests, `!`, `-a`, `-o`, grouping), `type [-t]`, `command [-v|-V]`
   (plain `command CMD` bypasses aliases and builtins), `source`/`.`,
@@ -72,6 +78,9 @@ All notable changes to Axonix are documented here. The format follows
 - Test fixtures: `full_shell` (real builtin registry, headless) and `run()`.
 
 ### Fixed
+- Children inherited an ignored SIGTSTP/SIGTTIN/SIGTTOU/SIGQUIT from the
+  shell and could not be suspended with Ctrl-Z.
+- `a | b &` only detached `b`; `a` was still waited on.
 - A variable whose value contained a quote (`set X "it's"; echo $X`) was
   mangled on expansion.
 - Pipeline fds were closed twice in some error paths, which could close

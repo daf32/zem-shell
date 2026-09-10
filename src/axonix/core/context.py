@@ -36,8 +36,10 @@ class ExecutionContext(BaseModel):
 
     # Use PrivateAttr for internal state that shouldn't be in model
     _last_exit_code: int = PrivateAttr(default=0)
-    _background_processes: List = PrivateAttr(default_factory=list)
+    _jobs: Any = PrivateAttr(default_factory=lambda: __import__(
+        "axonix.core.jobs", fromlist=["JobTable"]).JobTable())
     _dir_stack: List[str] = PrivateAttr(default_factory=list)  # pushd/popd
+    _exit_warned: bool = PrivateAttr(default=False)  # "There are stopped jobs."
     _shell: Any = PrivateAttr(default=None)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

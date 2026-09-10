@@ -208,8 +208,12 @@ class CommandExecutor:
                 else:
                     os.setpgid(0, pgid)
 
-                # Child receives Ctrl+C
-                signal.signal(signal.SIGINT, signal.SIG_DFL)
+                # The shell ignores the job-control signals (and SIGINT
+                # while spawning); ignored dispositions survive execve, so
+                # reset them or the child could never be Ctrl-C'd/Ctrl-Z'd.
+                for sig in (signal.SIGINT, signal.SIGQUIT, signal.SIGTSTP,
+                            signal.SIGTTIN, signal.SIGTTOU):
+                    signal.signal(sig, signal.SIG_DFL)
 
             try:
                 process = subprocess.Popen(
