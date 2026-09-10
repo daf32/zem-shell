@@ -23,6 +23,10 @@ def _configure_logging():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("--version", "-V"):
+        from axonix import __version__
+        print(f"axonix {__version__}")
+        return
     _configure_logging()
     try:
         from axonix.core.shell import Shell

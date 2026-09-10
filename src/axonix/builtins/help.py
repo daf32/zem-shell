@@ -116,7 +116,7 @@ class HelpCommand(BaseCommand):
         if cmd.tags:
             self._write(f"Tags: {', '.join(cmd.tags)}\n", stdout)
         
-        examples = getattr(cmd, "examples", None)
+        examples = cmd.examples
         if examples:
             self._write("\nExamples:\n", stdout)
             for ex in examples:

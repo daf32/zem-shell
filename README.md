@@ -22,7 +22,7 @@ Axonix is a modular Python-based shell focused on extensibility and speed.
 - **Built-in Commands (Builtins)**:
   - Directory Navigation: `cd`, `pwd`.
   - Variable Management: `set`, `get`, `unset`, `export`.
-  - Utility: `echo`, `add`, `history`, `help`, `exit`.
+  - Utility: `echo`, `history`, `help`, `exit`.
 
 - **Modern Configuration**:
   - **Centralized Config**: All operators and shell settings are managed in a root `config.json`.

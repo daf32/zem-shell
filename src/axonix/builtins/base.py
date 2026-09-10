@@ -21,12 +21,14 @@ class BaseCommand:
         help: Command description
         usage: Command usage syntax
         tags: Command classification tags (default: ["builtin"])
+        examples: Example invocations shown by `help <command>`
     """
     
     name: str = ""
     help: str = ""
     usage: str = ""
     tags: list[str] = []
+    examples: list[str] = []
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

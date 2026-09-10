@@ -1,3 +1,4 @@
+from axonix import __version__
 from axonix.builtins.base import BaseCommand
 from typing import TYPE_CHECKING
 
@@ -9,8 +10,6 @@ class LogoCommand(BaseCommand):
     help = "Display Axonix logo"
     usage = "logo [--version]"
     tags = ["builtin", "ui"]
-
-    VERSION = "1.0.0"
 
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
@@ -44,7 +43,7 @@ class LogoCommand(BaseCommand):
         if args and args[0] in ("--version", "-v"):
             print_formatted_text(FormattedText([
                 ("", "\n"),
-                (c.info, f"    Axonix Shell v{self.VERSION}"),
+                (c.info, f"    Axonix Shell v{__version__}"),
                 ("", "\n"),
             ]))
         else:

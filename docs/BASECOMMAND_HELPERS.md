@@ -143,7 +143,6 @@ self._write(text + "\n", stdout)
 |---------|---|---|---|
 | set.py | 14 | 9 | -36% |
 | get.py | 11 | 7 | -36% |
-| add.py | 25 | 20 | -20% |
 | **Total** | **50** | **36** | **-28%** |
 
 These helper methods significantly reduce boilerplate and improve consistency! 🚀

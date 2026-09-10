@@ -2,7 +2,7 @@ from axonix.core.context import ExecutionContext
 from axonix.core.parser import Parser
 from axonix.core.executor import CommandExecutor
 
-from axonix.builtins import load_plugins
+from axonix.builtins import DEFAULT_USER_PLUGINS_DIR, load_plugins
 from axonix.builtins.base import BaseCommand
 from axonix.builtins.registry import CommandRegistry
 
@@ -39,6 +39,7 @@ class Shell:
         commands: Optional[Dict[str, BaseCommand]] = None,
         config: Optional[AppConfig] = None,
         headless: bool = False,
+        user_plugins_dir: str | None = DEFAULT_USER_PLUGINS_DIR,
     ):
         """Construct a shell instance.
 
@@ -49,6 +50,10 @@ class Shell:
         Pipelines built from ``Parser`` plus ``Executor`` still work in
         headless mode — only the interactive REPL path (``Shell.run``)
         is unavailable.
+
+        ``user_plugins_dir`` is where external plugins are imported from
+        (``~/.axonix/plugins`` by default); ``None`` disables them. Only
+        consulted when ``commands`` is ``None``.
         """
         self.config = config or AppConfig()
         self.context = ExecutionContext()
@@ -57,7 +62,7 @@ class Shell:
         self.headless = headless
 
         if commands is None:
-            load_plugins()
+            load_plugins(user_plugins_dir)
             self.commands = CommandRegistry.get_all_commands()
         else:
             self.commands = commands
