@@ -20,8 +20,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
       - name: Check that the tag matches the package version
         run: |
           tag="${GITHUB_REF_NAME#v}"
@@ -34,7 +34,7 @@ jobs:
       - run: uv run pytest -q
       - run: uv build
       - run: uvx twine check dist/*
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -49,7 +49,7 @@ jobs:
     permissions:
       id-token: write  # trusted publishing, no API token needed
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -62,8 +62,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
@@ -78,7 +78,7 @@ jobs:
           if [ ! -s notes.md ]; then
             echo "No CHANGELOG section for $version; see the commit history." > notes.md
           fi
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
           body_path: notes.md
