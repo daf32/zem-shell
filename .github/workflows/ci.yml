@@ -29,6 +29,13 @@ jobs:
         run: uv run mypy
         continue-on-error: true
 
+      - name: Registry index is current
+        # index.json carries the checksum `hints install` verifies, so a spec
+        # edited without rebuilding the index would fail for every user.
+        run: |
+          uv run python scripts/build_hints_index.py
+          git diff --exit-code registry/index.json
+
   test:
     name: Test (${{ matrix.os }}, py${{ matrix.python }})
     runs-on: ${{ matrix.os }}

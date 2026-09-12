@@ -331,6 +331,64 @@ def _zem_variables(ctx: SourceContext) -> list[Suggestion]:
     ]
 
 
+@provider("zem.hint_specs")
+def _zem_hint_specs(ctx: SourceContext) -> list[Suggestion]:
+    """Commands a spec is loaded for, for `hints show`."""
+    registry = _hint_registry(ctx)
+    if registry is None:
+        return []
+    return [Suggestion(name, spec.origin) for name, spec in sorted(registry.load().items())]
+
+
+@provider("zem.installed_hints")
+def _zem_installed_hints(ctx: SourceContext) -> list[Suggestion]:
+    """Specs installed from the registry, for `hints remove`/`update`."""
+    config = getattr(ctx.shell, "config", None)
+    if config is None:
+        return []
+    directory = os.path.expanduser(config.hints.user_dir)
+    try:
+        names = sorted(f[:-5] for f in os.listdir(directory)
+                       if f.endswith(".json") and not f.startswith("."))
+    except OSError:
+        return []
+    return [Suggestion(name, "installed") for name in names]
+
+
+@provider("zem.registry_hints")
+def _zem_registry_hints(ctx: SourceContext) -> list[Suggestion]:
+    """Specs offered by the registry, from its cached index.
+
+    Deliberately cache-only: pressing TAB must never wait on the network.
+    `hints search` is what fetches.
+    """
+    config = getattr(ctx.shell, "config", None)
+    if config is None:
+        return []
+    from zem.hints.registry_client import cache_path_for
+
+    try:
+        with open(cache_path_for(config.hints.user_dir), encoding="utf-8") as handle:
+            entries = json.load(handle).get("hints", [])
+    except (OSError, ValueError):
+        return []
+    return [Suggestion(e.get("name", ""), e.get("description", "")) for e in entries
+            if e.get("name")]
+
+
+def _hint_registry(ctx: SourceContext):
+    completer = getattr(getattr(ctx.shell, "session", None), "completer", None)
+    registry = getattr(completer, "hints", None)
+    if registry is not None:
+        return registry
+    config = getattr(ctx.shell, "config", None)
+    if config is None:
+        return None
+    from zem.hints.loader import HintRegistry
+
+    return HintRegistry(config)
+
+
 @provider("zem.themes")
 def _zem_themes(ctx: SourceContext) -> list[Suggestion]:
     from zem.config.settings import AppConfig

@@ -25,10 +25,13 @@ def test_bundled_specs_all_parse():
     registry = HintRegistry(user_dir="/nonexistent")
     specs = registry.load()
     assert registry.errors() == {}
+    # The bundled set is deliberately small: tools almost everyone has.
+    # Niche ones (kubectl, brew, gh, go) live in the registry instead.
     assert {
-        "git", "pip", "pip3", "docker", "npm", "npx", "uv", "kubectl",
-        "brew", "gh", "ssh", "make", "go", "theme", "config", "weather",
+        "git", "pip", "pip3", "docker", "npm", "npx", "uv",
+        "ssh", "make", "theme", "config", "weather", "hints",
     } <= set(specs)
+    assert {"kubectl", "brew", "gh", "go"}.isdisjoint(specs)
 
 
 def test_aliases_register_extra_names():
