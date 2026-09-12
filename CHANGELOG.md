@@ -5,6 +5,17 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **Non-interactive mode.** `zem -c "command"` runs one command and exits with
+  its status, `zem script.zem` runs a file, and a script piped into `zem` is
+  read from stdin — so the shell can be used from a Makefile, a git hook or
+  CI. `~/.zemrc` is skipped in these modes (as in bash, zsh and fish) unless
+  `--rc` is passed. `zem --help` describes all of it.
+
+### Fixed
+- An unknown command-line option is an error instead of being ignored:
+  `zem --hepl` used to swallow the flag and open a session.
+
 
 ## [0.10.0] - 2026-09-12
 ### Added

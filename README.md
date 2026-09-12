@@ -46,6 +46,18 @@ Zem is a modular Python-based shell focused on extensibility and speed.
 - **Configuration**: one validated JSON file (`config set` refuses values the shell
   could not start with), `~/.zemrc`, plugins in `~/.zem/plugins/`.
 
+## Non-interactive use
+
+```bash
+zem -c "git status | grep modified"   # run one command, exit with its status
+zem build.zem                          # run a script
+echo "echo hi" | zem                   # or read it from stdin
+```
+
+`~/.zemrc` is not read in these modes (as in bash, zsh and fish), so a script
+behaves the same on a machine whose owner has never customised anything. Pass
+`--rc` if you want your aliases.
+
 ## 🚀 Installation
 
 ### From PyPI
