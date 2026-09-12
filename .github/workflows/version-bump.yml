@@ -8,6 +8,12 @@ name: Version bump
 #   major/...  -> 1.2.3 -> 2.0.0
 #   anything else (ci/, docs/, chore/, dependabot/...) -> no release
 #
+# Which to pick:
+#
+#   patch/  the default, however substantial the change
+#   minor/  a whole roadmap stage is finished
+#   major/  a milestone release gathering many changes
+#
 # It bumps [project] version in pyproject.toml, refreshes uv.lock, turns
 # the CHANGELOG "Unreleased" section into the new version, commits that
 # to main, tags vX.Y.Z and starts release.yml for the tag (a tag pushed

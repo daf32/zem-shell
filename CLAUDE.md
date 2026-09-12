@@ -6,6 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Zem is a modular Python shell (Python ≥ 3.13) built on `prompt-toolkit` and `pydantic-settings`. The entry point is `zem`, defined in `pyproject.toml` and resolving to `zem.main:main`. Dependency management is done with `uv`.
 
+## Releases
+
+Merging a PR into `main` releases it, and the PR's **branch name** picks the
+bump (`.github/workflows/version-bump.yml`): `patch/` is the default however
+big the change, `minor/` marks a whole roadmap stage being finished, `major/`
+a milestone release. Any other prefix (`docs/`, `ci/`, `chore/`) releases
+nothing. Never edit `version` in `pyproject.toml` by hand.
+
+Write user-facing changes into the `## [Unreleased]` section of `CHANGELOG.md`;
+the workflow renames it to the new version. When a branch is rebased after
+someone else's release, check that the entry did not land inside the section
+that release just closed.
+
 ## Common commands
 
 ```bash
