@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -125,6 +125,8 @@ class AppConfig(BaseSettings):
     active_theme: str = "default"
     venv: VenvScheme = Field(default_factory=VenvScheme)
     hints: HintsSettings = Field(default_factory=HintsSettings)
+    #: Plugins the user turned off with `plugin disable`.
+    disabled_plugins: List[str] = Field(default_factory=list)
     plugins: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("operators")

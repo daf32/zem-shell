@@ -37,7 +37,7 @@ class ThemeCommand(BaseCommand):
             self._write_err("theme: shell reference not available\n", stderr)
             return 1
         config = shell.config  # the live config, not a fresh read of the file
-        manager = ThemeManager(config)
+        manager = ThemeManager(config, _plugin_theme_dirs(shell))
 
         if not args:
             self._write(f"Current theme: {config.active_theme}\n", stdout)
@@ -200,3 +200,8 @@ class ThemeCommand(BaseCommand):
         else:
             raise ArgumentError(self.name, subcommand, reason="unknown subcommand")
         return 0
+
+
+def _plugin_theme_dirs(shell) -> list:
+    plugins = getattr(shell, "plugins", None)
+    return plugins.theme_dirs() if plugins is not None else []

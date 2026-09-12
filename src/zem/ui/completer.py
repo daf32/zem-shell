@@ -23,7 +23,10 @@ class ZemCompleter(Completer):
         self.shell = shell
         self.path_completer = EnhancedPathCompleter(expanduser=True)
         self.registry = CompleterRegistry()
-        self.hints = HintRegistry(shell.config)
+        self.hints = HintRegistry(
+            shell.config, extra_dirs=getattr(shell, "plugins", None).hint_spec_dirs()
+            if getattr(shell, "plugins", None) else (),
+        )
         self._spec_completers: dict = {}
         self._register_command_completers()
 
@@ -32,6 +35,13 @@ class ZemCompleter(Completer):
         for name, cmd in self.shell.commands.items():
             completer = cmd.get_completer()
             if completer is not None:
+                self.registry.register(name, completer)
+
+        # A plugin may complete a command it does not own -- `docker` from a
+        # docker plugin, say -- so these come last and win.
+        plugins = getattr(self.shell, "plugins", None)
+        if plugins is not None:
+            for name, completer in plugins.completers().items():
                 self.registry.register(name, completer)
 
     def _completer_for(self, name: str):

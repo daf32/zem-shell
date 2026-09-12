@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "command": "plugin",
+  "description": "Inspect and manage plugins",
+  "fallback": "none",
+  "subcommands": [
+    {"name": "list", "description": "List the plugins that were found"},
+    {"name": "info", "description": "Show what one plugin provides",
+     "args": [{"name": "name", "source": {"type": "provider", "name": "zem.plugins"}}]},
+    {"name": "enable", "description": "Load a plugin again",
+     "args": [{"name": "name", "source": {"type": "provider", "name": "zem.plugins"}}]},
+    {"name": "disable", "description": "Stop loading a plugin",
+     "args": [{"name": "name", "source": {"type": "provider", "name": "zem.plugins"}}]}
+  ]
+}

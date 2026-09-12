@@ -72,6 +72,13 @@ The runtime is a REPL composed of three layers: a parser produces an AST of pipe
 - `BaseCommand.get_default_config()` returns plugin defaults; `Shell._sync_plugin_configs()` writes any missing entries into `config.json` under `plugins.<name>` on startup, so plugins ship working config out of the box.
 - Helper API on `BaseCommand`: `_require_args`, `_get_arg`, `_validate_identifier`, `_write`, `_write_err`, `_input`, `_read_stdin_all`, `_colorize`, `_print_colored` (plain text when the stream is not a tty), `get_plugin_config`. Shared helpers: `builtins/_cwd.py` (cd/pushd/popd), `_quote.py`, `_test_expr.py`, `_jobspec.py`. See `docs/COMMAND_DEVELOPMENT.md`.
 
+### Plugins (`src/zem/plugin/`)
+
+- `base.py` — `Plugin`, the class third parties subclass, plus `PLUGIN_API_VERSION`. Hooks: `commands`, `hint_specs`, `hint_providers`, `completers`, `themes`, `on_startup`, `on_exit`, `pre_exec` (may rewrite the line), `post_exec`. Every hook is optional.
+- `manager.py` — `PluginManager.discover()` walks three sources, weakest first: bundled (`zem.builtins.*` imported as the shell itself, `zem.plugins.*` listed as plugins), `zem.plugins` entry points, then `~/.zem/plugins/*.py`. A later source replaces an earlier one by name. Nothing raises out of it: an import error, a hook that raises, or an `api_version` from the future is stored on the `LoadedPlugin` record and the rest load. Disabling works by *not importing* (commands register at import time), driven by `config.disabled_plugins`.
+- `Shell` keeps the manager on `self.plugins`, calls `on_startup` after `_sync_plugin_configs`, `on_exit` from `_close_shell`, and `rewrite_line`/`post_exec` around `_execute_units` in `_execute_line`. `ZemCompleter` passes `plugins.hint_spec_dirs()` into `HintRegistry` and registers `plugins.completers()` last; `ThemeManager` takes `extra_dirs`.
+- `builtins/__init__.load_plugins()` is now a thin wrapper returning the manager, so existing callers (and tests) are unchanged.
+
 ### Configuration (`src/zem/config/settings.py`)
 
 `AppConfig` is a `BaseSettings` model with sections: `operators`, `input`, `history`, `rc`, `colors`, `venv`, `plugins`, plus `active_theme`. Sources, in priority order: init args → `JsonConfigSettingsSource` (path resolved per instance via `get_config_path()`) → env vars. The config file is auto-created from defaults if missing. `validate_unique_operators` rejects any two operators sharing the same symbol — keep this in mind when adding/renaming operators. `format_validation_error` renders pydantic errors as `loc: msg` lines.
