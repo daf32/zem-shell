@@ -25,6 +25,7 @@ from zem.core.scan import join_lines
 from zem.errors.base_error import CLIError
 from zem.errors.execute_error import ExecutionError
 from zem.errors.parser_error import ParseError
+from zem.plugin.manager import PluginManager
 from zem.ui.completer import ZemCompleter
 from zem.ui.history import ZemFileHistory
 from zem.ui.lexer import ZemLexer
@@ -70,9 +71,13 @@ class Shell:
         self.headless = headless
 
         if commands is None:
-            load_plugins(user_plugins_dir)
+            self.plugins = load_plugins(
+                user_plugins_dir, disabled=frozenset(self.config.disabled_plugins)
+            )
             self.commands = CommandRegistry.get_all_commands()
         else:
+            # An explicit command map means "just these"; no discovery.
+            self.plugins = PluginManager(user_plugins_dir=None)
             self.commands = commands
 
         self.context.commands = self.commands
@@ -95,6 +100,7 @@ class Shell:
             activate_venv(self.context)
 
         self._sync_plugin_configs()
+        self.plugins.notify("on_startup", self)
 
         if headless:
             # Sentinel values; nothing reads them except `_close_shell`,
@@ -323,6 +329,8 @@ class Shell:
                 pass
 
     def _close_shell(self):
+        # Plugins get told first, while the shell is still whole.
+        self.plugins.notify("on_exit", self)
         self._restore_terminal()
 
         # Like bash: remaining jobs get SIGHUP (and SIGCONT so stopped ones
@@ -566,6 +574,8 @@ class Shell:
         if add_to_history:
             self._add_history(user_input)
 
+        user_input = self.plugins.rewrite_line(user_input, self)
+
         try:
             self._execute_units(self._parser(user_input).iter_units())
         except CLIError as e:
@@ -574,6 +584,8 @@ class Shell:
         except Exception as e:
             self.context.last_exit_code = 1
             self._print_error(f"internal error: {e}")
+
+        self.plugins.notify("post_exec", user_input, self.context.last_exit_code, self)
 
 
 

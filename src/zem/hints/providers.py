@@ -389,13 +389,26 @@ def _hint_registry(ctx: SourceContext):
     return HintRegistry(config)
 
 
+@provider("zem.plugins")
+def _zem_plugins(ctx: SourceContext) -> list[Suggestion]:
+    """Plugins that were found, for `plugin info`/`enable`/`disable`."""
+    manager = getattr(ctx.shell, "plugins", None)
+    if manager is None:
+        return []
+    return [
+        Suggestion(record.name, record.description or record.origin)
+        for record in sorted(manager.loaded, key=lambda r: r.name)
+    ]
+
+
 @provider("zem.themes")
 def _zem_themes(ctx: SourceContext) -> list[Suggestion]:
     from zem.config.settings import AppConfig
     from zem.utils.themes import ThemeManager
 
     config = getattr(ctx.shell, "config", None) or AppConfig()
-    manager = ThemeManager(config)
+    plugins = getattr(ctx.shell, "plugins", None)
+    manager = ThemeManager(config, plugins.theme_dirs() if plugins is not None else ())
     return [
         Suggestion(name, str(data.get("data", {}).get("type", "")))
         for name, data in sorted(manager.list_themes().items())

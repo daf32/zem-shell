@@ -5,6 +5,20 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **Plugin API.** A plugin is a `Plugin` subclass — a single file in
+  `~/.zem/plugins/` or a package declaring a `zem.plugins` entry point
+  (`uv tool install zem --with your-plugin`). It can contribute commands,
+  completion hint specs, value providers, Python completers and themes, and
+  hook into `on_startup`, `on_exit`, `pre_exec` (which may rewrite the line)
+  and `post_exec`. `plugin list|info|enable|disable` manages them, and
+  `disabled_plugins` in the config records what is off. Plugins that only
+  declared commands, with no `Plugin` class, keep working unchanged. See
+  `docs/PLUGINS.md`.
+- One broken plugin no longer risks the shell: a failing import, a failing
+  hook or an `api_version` from the future is recorded against that plugin
+  and everything else loads.
+
 
 ## [0.11.1] - 2026-09-12
 ### Added

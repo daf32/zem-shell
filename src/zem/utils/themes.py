@@ -28,16 +28,19 @@ class ThemeManager:
     # Regex pattern for valid hex colors
     HEX_COLOR_PATTERN = re.compile(r'^#[0-9A-Fa-f]{6}$')
     
-    def __init__(self, config):
+    def __init__(self, config, extra_dirs=()):
         self.config = config
         self._themes_dir = Path(__file__).parent.parent / "themes"
         self._user_themes_dir = Path.home() / ".zem" / "themes"
+        #: Directories contributed by plugins, between bundled and user.
+        self._extra_dirs = [Path(p).expanduser() for p in extra_dirs]
         self._cached_themes: Optional[Dict] = None
         self._validation_errors: Dict[str, List[str]] = {}
     
     def get_themes_dirs(self) -> List[Path]:
-        """Get all theme directories."""
+        """Get all theme directories, weakest first."""
         dirs = [self._themes_dir]
+        dirs += [path for path in self._extra_dirs if path.exists()]
         if self._user_themes_dir.exists():
             dirs.append(self._user_themes_dir)
         return dirs
