@@ -41,7 +41,9 @@ Zem is a modular Python-based shell focused on extensibility and speed.
   `npm run <TAB>` the scripts in `package.json`, `make <TAB>` your targets. Ships
   with specs for git, docker, npm, pip, uv, kubectl, brew, gh, ssh, make and go —
   and a spec is just JSON, so adding your own tool means dropping a file in
-  `~/.zem/hints/`. See [docs/HINT_SPECS.md](docs/HINT_SPECS.md).
+  `~/.zem/hints/`. More tools (`kubectl`, `brew`, `gh`, `go`, …) install on
+  demand from the [spec registry](https://github.com/daf32/zem-hints) with
+  `hints install kubectl`. See [docs/HINT_SPECS.md](docs/HINT_SPECS.md).
 
 - **Configuration**: one validated JSON file (`config set` refuses values the shell
   could not start with), `~/.zemrc`, plugins in `~/.zem/plugins/`.

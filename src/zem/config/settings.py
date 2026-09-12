@@ -81,6 +81,8 @@ class HintsSettings(BaseModel):
     command_timeout_ms: int = Field(default=300, ge=1, le=2000)
     cache_ttl_ms: int = Field(default=2000, ge=0, le=600_000)
     user_dir: str = "~/.zem/hints"
+    #: Where `hints install` looks for specs that do not ship with Zem.
+    registry_url: str = "https://raw.githubusercontent.com/daf32/zem-hints/main"
 
 def format_validation_error(error) -> list[str]:
     """``loc: msg`` lines for a pydantic ``ValidationError``."""

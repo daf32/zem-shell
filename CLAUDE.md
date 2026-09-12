@@ -76,7 +76,9 @@ Argument completion is declarative: JSON specs in `src/zem/hints/data/` (bundled
 - `providers.py` — `PROVIDERS` registry plus the `@provider` decorator; specs name providers as strings, resolved lazily, which is the seam the plugin API will use.
 - `completer.py` — `SpecCompleter(BaseArgCompleter)`: yields static suggestions before dynamic ones (a cancelled round should lose the expensive half), `fallback_to_paths = False` because `spec.fallback` states it explicitly.
 
-Config section `hints` (`enable`, `dynamic`, `command_timeout_ms`, `cache_ttl_ms`, `user_dir`). Tests: `tests/hints/`; the suite-wide `_no_hint_subprocess` fixture in `tests/conftest.py` stubs `sources.run_command` so no test depends on a real git/docker, and `tests/hints/conftest.py` overrides it. See `docs/HINT_SPECS.md`.
+- `registry_client.py` — fetches `index.json` and specs over HTTPS for the `hints` builtin: SHA-256 from the index is checked and the spec is validated before it is written to `~/.zem/hints/`. The index cache goes *beside* the spec directory (`cache_path_for`), never inside it — anything `*.json` in there is loaded as a spec.
+
+Bundled specs cover tools almost everyone has; niche ones live in the separate [daf32/zem-hints](https://github.com/daf32/zem-hints) repository (specs in `hints/`, catalogue in `index.json`, validated in its own CI with `zem hints validate`) and are installed with `hints install`. Config section `hints` (`enable`, `dynamic`, `command_timeout_ms`, `cache_ttl_ms`, `user_dir`, `registry_url`). Tests: `tests/hints/`; the suite-wide `_no_hint_subprocess` fixture in `tests/conftest.py` stubs `sources.run_command` so no test depends on a real git/docker, and `tests/hints/conftest.py` overrides it. See `docs/HINT_SPECS.md`.
 
 ### Themes (`src/zem/themes/`)
 

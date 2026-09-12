@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "command": "hints",
+  "description": "Inspect and install completion hint specs",
+  "fallback": "none",
+  "subcommands": [
+    {"name": "list", "description": "List the specs in use"},
+    {"name": "show", "description": "Show a spec's subcommands and flags",
+     "args": [{"name": "command", "source": {"type": "provider", "name": "zem.hint_specs"}}]},
+    {"name": "search", "description": "Search the registry",
+     "args": [{"name": "query", "source": {"type": "none"}}]},
+    {"name": "install", "description": "Install a spec from the registry",
+     "args": [{"name": "name", "variadic": true,
+               "source": {"type": "provider", "name": "zem.registry_hints"}}]},
+    {"name": "remove", "description": "Remove an installed spec",
+     "args": [{"name": "name", "variadic": true,
+               "source": {"type": "provider", "name": "zem.installed_hints"}}]},
+    {"name": "update", "description": "Update installed specs",
+     "args": [{"name": "name", "variadic": true,
+               "source": {"type": "provider", "name": "zem.installed_hints"}}]},
+    {"name": "validate", "description": "Check a spec file or directory",
+     "args": [{"name": "path", "source": {"type": "files", "extensions": [".json"]}}]},
+    {"name": "providers", "description": "List the value providers available"},
+    {"name": "reload", "description": "Re-read specs and drop cached values"}
+  ]
+}

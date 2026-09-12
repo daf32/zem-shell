@@ -58,6 +58,8 @@ class HintRegistry:
             if not directory.is_dir():
                 continue
             for path in sorted(directory.glob("*.json")):
+                if path.name.startswith("."):
+                    continue  # editor swap files, caches, anything not a spec
                 spec = self._read(path, origin, errors)
                 if spec is None:
                     continue

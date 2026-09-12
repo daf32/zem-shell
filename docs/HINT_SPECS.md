@@ -180,3 +180,51 @@ make an arbitrary command safe. Read a spec before you drop it in
 Some things a spec cannot express. `BaseArgCompleter` is still supported and
 still wins over a bundled spec, so a builtin or plugin that implements
 `get_completer()` keeps working — see `docs/COMMAND_DEVELOPMENT.md`.
+
+## Where specs come from
+
+Zem ships a small core — specs for tools almost everyone has (`git`, `docker`,
+`npm`, `pip`, `uv`, `ssh`, `make`) plus its own commands. A freshly installed
+shell is useful with no network and no configuration.
+
+Everything else lives in a **registry**: a directory of specs with an
+`index.json`, fetched on demand.
+
+```bash
+hints search kube        # what the registry offers
+hints install kubectl    # download it into ~/.zem/hints/
+hints update             # refresh what you installed
+hints remove kubectl
+hints list               # what is in use, and where each spec came from
+```
+
+An installed spec sits in `~/.zem/hints/`, which also means it overrides a
+bundled one of the same name — copy, edit, done.
+
+`hints install` verifies the SHA-256 from the index and validates the spec
+before writing it, so a truncated download or a malformed file never reaches
+the shell. It still cannot vouch for what the spec *does*: see the trust note
+above.
+
+The default registry is [daf32/zem-hints](https://github.com/daf32/zem-hints).
+Point Zem at your own with:
+
+```bash
+config set hints.registry_url https://example.com/my-hints
+```
+
+A registry is just a directory served over HTTPS:
+
+```
+index.json          # {"schema_version": 1, "hints": [{name, command, description,
+hints/kubectl.json  #   subcommands, size, sha256}, ...]}
+hints/brew.json
+```
+
+## Contributing a spec
+
+Specs for niche tools go to the registry, not into the wheel: they reach users
+without waiting for a Zem release, and they do not weigh down an install for
+people who do not use that tool. Write the file, check it with
+`hints validate`, rebuild the catalogue with the registry's index script, and
+open a pull request there.
