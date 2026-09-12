@@ -6,6 +6,7 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-12
 ## [0.10.0] - 2026-09-12
 ### Added
 - **Declarative completion hints.** Argument completion is now driven by JSON
