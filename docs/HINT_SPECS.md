@@ -206,7 +206,8 @@ before writing it, so a truncated download or a malformed file never reaches
 the shell. It still cannot vouch for what the spec *does*: see the trust note
 above.
 
-The registry lives at `hints.registry_url`, so you can point Zem at your own:
+The default registry is [daf32/zem-hints](https://github.com/daf32/zem-hints).
+Point Zem at your own with:
 
 ```bash
 config set hints.registry_url https://example.com/my-hints
@@ -216,16 +217,14 @@ A registry is just a directory served over HTTPS:
 
 ```
 index.json          # {"schema_version": 1, "hints": [{name, command, description,
-hints/git.json      #   subcommands, size, sha256}, ...]}
-hints/kubectl.json
+hints/kubectl.json  #   subcommands, size, sha256}, ...]}
+hints/brew.json
 ```
-
-`scripts/build_hints_index.py` regenerates `index.json` from `registry/hints/`,
-validating every spec on the way.
 
 ## Contributing a spec
 
-Specs for niche tools go in `registry/hints/`, not in the wheel: they reach
-users without waiting for a Zem release, and they do not weigh down an install
-for people who do not use that tool. Add the file, run the index script, open a
-PR.
+Specs for niche tools go to the registry, not into the wheel: they reach users
+without waiting for a Zem release, and they do not weigh down an install for
+people who do not use that tool. Write the file, check it with
+`hints validate`, rebuild the catalogue with the registry's index script, and
+open a pull request there.

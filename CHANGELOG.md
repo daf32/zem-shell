@@ -27,8 +27,9 @@ All notable changes to Zem are documented here. The format follows
   `hints search` / `hints install` / `hints update` / `hints remove`, which
   verify each download's checksum and validate it before writing to
   `~/.zem/hints/`. `hints list`, `hints show <command>`, `hints validate` and
-  `hints providers` cover inspection and writing your own. Point
-  `hints.registry_url` at your own registry if you like.
+  `hints providers` cover inspection and writing your own. The default
+  registry is [daf32/zem-hints](https://github.com/daf32/zem-hints); point
+  `hints.registry_url` at your own if you like.
 
 ### Fixed
 - Flags with a typed prefix complete again. `pip install --upg<TAB>` produced

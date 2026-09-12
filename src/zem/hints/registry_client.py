@@ -21,7 +21,7 @@ from zem.hints.spec import SpecError, parse_spec
 
 log = logging.getLogger(__name__)
 
-DEFAULT_REGISTRY_URL = "https://raw.githubusercontent.com/daf32/zem-shell/main/registry"
+DEFAULT_REGISTRY_URL = "https://raw.githubusercontent.com/daf32/zem-hints/main"
 HTTP_TIMEOUT = 15
 #: The index is small and changes rarely; `search` should not hit the
 #: network every time someone browses.
