@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from zem.config.settings import OperatorsConfig
 
 NORMAL, SINGLE, DOUBLE, SUBST = range(4)
+
+#: Characters that start a redirection operator. A word made of these (plus a
+#: leading fd digit) is shell syntax, not an argument of the command.
+_REDIRECT_CHARS = "<>&"
 
 
 def scan(text: str, ops: "OperatorsConfig") -> tuple[list[tuple[str, bool, int]], int, bool]:
@@ -90,3 +95,84 @@ def join_lines(first: str, second: str, ops: "OperatorsConfig") -> str:
     if dangling:
         return first[:-1] + second
     return first + "\n" + second
+
+
+@dataclass(frozen=True)
+class Word:
+    """One word of a command line, with its position in the source text.
+
+    ``text`` is the raw slice (quotes and escapes kept), ``value`` is what
+    the word means once quoting is resolved. Completion needs both: the raw
+    length to compute ``start_position``, the value to match a prefix
+    against.
+    """
+
+    text: str
+    value: str
+    start: int
+    end: int
+    is_redirect: bool = False
+
+
+def split_words(text: str, ops: "OperatorsConfig") -> list[Word]:
+    """Split ``text`` into words, honouring quotes and escapes.
+
+    Unlike :meth:`zem.core.parser.Parser._tokenize` this performs no
+    expansion whatsoever: no variables, no globs and — crucially — no
+    ``$(...)`` substitution. Completion runs on every keystroke, so running
+    a command just to split a line would be a disaster.
+    """
+    chars, _, _ = scan(text, ops)
+    words: list[Word] = []
+    buf: list[str] = []
+    start = -1
+
+    def flush(end: int) -> None:
+        nonlocal start, buf
+        if start >= 0:
+            raw = text[start:end]
+            words.append(Word(raw, "".join(buf), start, end, _is_redirect(raw)))
+            buf = []
+            start = -1
+
+    for i, (ch, escaped, state) in enumerate(chars):
+        if not escaped and state == NORMAL and ch.isspace():
+            flush(i)
+            continue
+
+        # Quote and escape characters delimit the word but are not part of
+        # its value. `scan` records the state *before* the transition, so an
+        # opening quote carries NORMAL and the closing one carries its own
+        # state -- hence two states per quote character.
+        is_syntax = not escaped and (
+            (ch == ops.escape and state in (NORMAL, DOUBLE))
+            or (ch == ops.quote and state in (NORMAL, SINGLE))
+            or (ch == ops.double_quote and state in (NORMAL, DOUBLE))
+        )
+
+        if start < 0:
+            start = i
+        if not is_syntax:
+            buf.append(ch)
+
+    flush(len(text))
+    return words
+
+
+def _is_redirect(raw: str) -> bool:
+    """True for a bare redirection operator (`>`, `>>`, `2>`, `&>` ...)."""
+    body = raw[1:] if raw[:1].isdigit() else raw
+    return bool(body) and all(c in _REDIRECT_CHARS for c in body)
+
+
+def word_at(text: str, ops: "OperatorsConfig") -> tuple[list[Word], int]:
+    """Words of ``text`` plus the index of the one under the cursor.
+
+    ``text`` is the text *before* the cursor, so the cursor sits on the last
+    word unless the line ends on a separator, in which case the index is
+    ``-1``: the user is starting a new word.
+    """
+    words = split_words(text, ops)
+    if words and words[-1].end == len(text):
+        return words, len(words) - 1
+    return words, -1
