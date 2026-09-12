@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.11.1] - 2026-09-12
 ### Added
 - **Non-interactive mode.** `zem -c "command"` runs one command and exits with
   its status, `zem script.zem` runs a file, and a script piped into `zem` is
