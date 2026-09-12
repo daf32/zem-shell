@@ -5,6 +5,14 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- `plugin install` / `plugin remove` / `plugin packages`. Installing detects
+  how Zem itself was installed (`uv tool`, `pipx`, or a virtualenv) and runs
+  the matching command, showing it and asking first — `-y` skips the question,
+  and with no terminal to ask on it refuses instead of guessing. Under `uv` it
+  re-passes the extras already installed, since `uv tool install --with`
+  replaces rather than adds.
+
 
 ## [0.11.2] - 2026-09-12
 ### Added

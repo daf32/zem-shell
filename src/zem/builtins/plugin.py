@@ -1,3 +1,4 @@
+import sys
 from typing import TYPE_CHECKING
 
 from zem.builtins.base import BaseCommand
@@ -9,18 +10,27 @@ if TYPE_CHECKING:
 
 class PluginCommand(BaseCommand):
     help = "Inspect and manage plugins"
-    usage = "plugin [list|info|enable|disable] [name]"
+    usage = "plugin [list|info|install|remove|packages|enable|disable] [name]"
     tags = ["builtin"]
     examples = [
-        "plugin              - List the plugins that were found",
-        "plugin info weather - Show what one plugin provides",
-        "plugin disable foo  - Stop loading it (takes effect next start)",
-        "plugin enable foo   - Load it again",
+        "plugin                     - List the plugins that were found",
+        "plugin info weather        - Show what one plugin provides",
+        "plugin install zem-plugin-x - Install a plugin package",
+        "plugin remove zem-plugin-x  - Uninstall it",
+        "plugin packages            - Installed packages that provide plugins",
+        "plugin disable foo         - Stop loading it (takes effect next start)",
+        "plugin enable foo          - Load it again",
     ]
+
+    #: Installing shells out and asks for confirmation on stdin.
+    main_thread_only = True
 
     _SUBCOMMANDS = {
         "list": "_list",
         "info": "_info",
+        "install": "_install",
+        "remove": "_remove",
+        "packages": "_packages",
         "enable": "_enable",
         "disable": "_disable",
     }
@@ -106,6 +116,110 @@ class PluginCommand(BaseCommand):
                     self._write(f"  {label}: {', '.join(str(v) for v in values)}\n", stdout)
         self._write("\n", stdout)
         return 0
+
+    # -- installing --------------------------------------------------------
+
+    def _install(self, args, shell, stdout, stderr) -> int:
+        packages, assume_yes = self._split_yes(args)
+        if not packages:
+            raise ArgumentError(self.name, args, reason="expected <package>...")
+        return self._change(shell, packages, assume_yes, stdout, stderr, removing=False)
+
+    def _remove(self, args, shell, stdout, stderr) -> int:
+        names, assume_yes = self._split_yes(args)
+        if not names:
+            raise ArgumentError(self.name, args, reason="expected <package>...")
+
+        from zem.plugin.installer import find_distribution_for
+
+        # Accept either the plugin's name or its distribution's.
+        packages = []
+        for name in names:
+            packages.append(find_distribution_for(name) or name)
+        return self._change(shell, packages, assume_yes, stdout, stderr, removing=True)
+
+    def _change(self, shell, packages, assume_yes, stdout, stderr, removing: bool) -> int:
+        from zem.plugin.installer import InstallError, detect_environment, run, validate
+
+        try:
+            validate(packages)
+        except InstallError as exc:
+            self._write_err(f"plugin: {exc}\n", stderr)
+            return 2
+
+        environment = detect_environment()
+        if not environment.can_install:
+            self._write_err(f"plugin: {environment.reason}\n", stderr)
+            return 1
+
+        command = (environment.uninstall_command(packages) if removing
+                   else environment.install_command(packages))
+        colors = shell.config.colors
+        verb = "Remove" if removing else "Install"
+        self._print_colored([
+            ("", f"{verb} {', '.join(packages)} via "),
+            (colors.info, environment.description),
+        ], stdout)
+        self._print_colored([(colors.comment, f"  {' '.join(command)}")], stdout)
+        if not removing:
+            # A plugin runs in your shell, with your permissions, on every
+            # command. That is worth one sentence before installing one.
+            self._print_colored([
+                (colors.warning, "  note: "),
+                ("", "a plugin runs code in your shell on every command"),
+            ], stdout)
+
+        if not assume_yes and not self._confirm(stdout, stderr):
+            self._write("Cancelled\n", stdout)
+            return 1
+
+        try:
+            code = run(command, stdout, stderr)
+        except InstallError as exc:
+            self._write_err(f"plugin: {exc}\n", stderr)
+            return 1
+        if code != 0:
+            self._write_err(f"plugin: {command[0]} exited with {code}\n", stderr)
+            return code
+
+        done = "removed" if removing else "installed"
+        self._write(f"{', '.join(packages)} {done}; restart zem to pick it up\n", stdout)
+        return 0
+
+    def _packages(self, args, shell, stdout, stderr) -> int:
+        from zem.plugin.installer import installed_distributions
+
+        found = installed_distributions()
+        if not found:
+            self._write("No installed package provides a zem plugin\n", stdout)
+            return 0
+        colors = shell.config.colors
+        self._write("\n", stdout)
+        for name, version in found:
+            self._print_colored([
+                (colors.command, f"  {name:<28}"),
+                (colors.comment, version),
+            ], stdout)
+        self._write("\n", stdout)
+        return 0
+
+    @staticmethod
+    def _split_yes(args) -> tuple:
+        packages = [a for a in args if a not in ("-y", "--yes")]
+        return packages, len(packages) != len(args)
+
+    def _confirm(self, stdout, stderr) -> bool:
+        stream = stdout or sys.stdout
+        if not getattr(sys.stdin, "isatty", lambda: False)():
+            self._write_err(
+                "plugin: refusing to install without a terminal to confirm on; "
+                "pass -y if you meant it\n",
+                stderr,
+            )
+            return False
+        stream.write("Proceed? [y/N] ")
+        stream.flush()
+        return self._input().strip().lower() in ("y", "yes")
 
     def _enable(self, args, shell, stdout, stderr) -> int:
         return self._toggle(args, shell, stdout, stderr, disable=False)

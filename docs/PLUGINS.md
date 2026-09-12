@@ -104,9 +104,23 @@ expects hooks which do not exist.
 ```
 plugin list              what was found, where from, and whether it loaded
 plugin info <name>       version, source, and what it provides
+plugin install <pkg>     install a plugin package
+plugin remove <pkg>      uninstall it
+plugin packages          installed packages that provide plugins
 plugin disable <name>    stop loading it
 plugin enable <name>     load it again
 ```
+
+`plugin install` works out how Zem itself was installed and uses the matching
+command — `uv tool install`, `pipx inject`, or `pip install` into the same
+interpreter — because installing into the wrong one means Zem never sees the
+plugin. It prints the exact command and asks before running it; `-y` skips the
+question, and without a terminal to ask on it refuses rather than guessing.
+
+One detail worth knowing if you use `uv`: `uv tool install --with` *replaces*
+the extras rather than adding to them, so `plugin install` reads what is
+already there and passes it again. Installing a second plugin by hand with a
+bare `uv tool install zem --with new-one` would quietly uninstall the first.
 
 Disabling writes to `disabled_plugins` in `config.json` and takes effect on
 the next start: a command registers itself when its module is imported, so the
