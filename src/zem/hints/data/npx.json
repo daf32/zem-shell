@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "command": "npx",
+  "description": "Run a command from a package",
+  "fallback": "files",
+  "options": [
+    {"names": ["-y", "--yes"], "description": "Install missing packages without asking"},
+    {"names": ["--no-install"], "description": "Fail instead of installing"},
+    {"names": ["-p", "--package"], "description": "Package to run from",
+     "value": {"type": "none"}},
+    {"names": ["-c", "--call"], "description": "Run a string as a command",
+     "value": {"type": "none"}}
+  ],
+  "args": [{"name": "command", "source": {"type": "commands"}},
+           {"name": "args", "variadic": true, "source": {"type": "none"}}]
+}

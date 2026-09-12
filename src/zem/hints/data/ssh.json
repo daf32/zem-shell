@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "command": "ssh",
+  "description": "Log into a remote machine",
+  "fallback": "none",
+  "options": [
+    {"names": ["-p", "--port"], "description": "Port to connect to", "value": {"type": "none"}},
+    {"names": ["-i"], "description": "Identity file", "value": {"type": "files"}},
+    {"names": ["-l"], "description": "Log in as this user", "value": {"type": "none"}},
+    {"names": ["-F"], "description": "Config file", "value": {"type": "files"}},
+    {"names": ["-L"], "description": "Local port forwarding", "value": {"type": "none"}},
+    {"names": ["-R"], "description": "Remote port forwarding", "value": {"type": "none"}},
+    {"names": ["-D"], "description": "Dynamic SOCKS forwarding", "value": {"type": "none"}},
+    {"names": ["-J"], "description": "Connect via a jump host",
+     "value": {"type": "provider", "name": "ssh.hosts"}},
+    {"names": ["-A"], "description": "Forward the authentication agent"},
+    {"names": ["-t"], "description": "Force a pseudo-terminal"},
+    {"names": ["-N"], "description": "Do not run a remote command"},
+    {"names": ["-v"], "description": "Verbose output"}
+  ],
+  "args": [{"name": "destination", "description": "Host to connect to",
+            "source": {"type": "provider", "name": "ssh.hosts"}},
+           {"name": "command", "variadic": true, "source": {"type": "none"}}]
+}

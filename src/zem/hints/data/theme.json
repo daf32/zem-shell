@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "command": "theme",
+  "description": "Manage colour themes",
+  "fallback": "none",
+  "subcommands": [
+    {"name": "list", "description": "List available themes"},
+    {"name": "set", "description": "Switch to a theme",
+     "args": [{"name": "theme", "source": {"type": "provider", "name": "zem.themes"}}]},
+    {"name": "preview", "description": "Preview a theme's colours",
+     "args": [{"name": "theme", "source": {"type": "provider", "name": "zem.themes"}}]},
+    {"name": "variants", "description": "Show a theme's light/dark variants",
+     "args": [{"name": "theme", "source": {"type": "provider", "name": "zem.themes"}}]},
+    {"name": "export", "description": "Write the current colours to a file",
+     "args": [{"name": "path", "source": {"type": "files"}}]},
+    {"name": "import", "description": "Install a theme from a JSON file",
+     "args": [{"name": "path", "source": {"type": "files", "extensions": [".json"]}}]},
+    {"name": "install", "description": "Install a theme from a URL",
+     "args": [{"name": "url", "source": {"type": "none"}}]}
+  ]
+}

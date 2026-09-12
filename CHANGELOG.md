@@ -5,6 +5,38 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **Declarative completion hints.** Argument completion is now driven by JSON
+  specs describing a command's subcommands, flags and where their values come
+  from, executed by one engine. Dynamic values are real: `git checkout` lists
+  your branches, `git push` your remotes, `git add` your changed files,
+  `docker exec` your running containers, `npm run` the scripts in
+  `package.json`, `make` your targets, `ssh` the hosts in `~/.ssh/config`,
+  `theme set` your themes, `config get` the live config keys.
+- Specs ship for git, pip, docker, npm, npx, uv, kubectl, brew, gh, ssh, make,
+  go, plus zem's own `theme`, `config` and `weather`. Drop a JSON file in
+  `~/.zem/hints/` to add your own tool or replace a bundled spec — see
+  `docs/HINT_SPECS.md`. New config section `hints`, including
+  `hints.dynamic = false` to stop specs shelling out entirely.
+- Completion now runs on a worker thread, so a spec that shells out cannot
+  stall the prompt.
+
+### Fixed
+- Flags with a typed prefix complete again. `pip install --upg<TAB>` produced
+  nothing at all: the word under the cursor was cut at the dash, so no flag
+  matched, and the path fallback was suppressed because the word began with
+  `-`. Every flag branch of the git/pip/docker/npm completers was dead code.
+- An alias is expanded in full during completion. With
+  `alias gs='git status'`, `gs <TAB>` offered git's subcommands as though
+  `status` had not been typed.
+- Completion splits the line the way the shell does: quoted arguments count as
+  one word, and a `> out.txt` redirection no longer counts as an argument.
+
+### Changed
+- `BaseArgCompleter` and `get_completer()` are unchanged and still take
+  precedence over a bundled spec, so plugins that implement them keep working.
+  Two details they observe did change: `word_before` now keeps leading dashes,
+  and `parts` is quote-aware with the alias expanded.
 
 ## [0.9.12] - 2026-09-10
 ### Removed

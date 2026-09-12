@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "command": "npm",
+  "description": "Node package manager",
+  "fallback": "files",
+  "options": [
+    {"names": ["-g", "--global"], "description": "Operate on the global prefix",
+     "inherited": true},
+    {"names": ["--silent"], "description": "Suppress output", "inherited": true},
+    {"names": ["--version"], "description": "Print the npm version"}
+  ],
+  "subcommands": [
+    {
+      "name": "install",
+      "aliases": ["i", "add"],
+      "description": "Install dependencies",
+      "options": [
+        {"names": ["-S", "--save"], "description": "Record in dependencies"},
+        {"names": ["-D", "--save-dev"], "description": "Record in devDependencies"},
+        {"names": ["-O", "--save-optional"], "description": "Record in optionalDependencies"},
+        {"names": ["-E", "--save-exact"], "description": "Pin the exact version"},
+        {"names": ["--no-save"], "description": "Do not touch package.json"},
+        {"names": ["--legacy-peer-deps"], "description": "Ignore peer dependency conflicts"},
+        {"names": ["-f", "--force"], "description": "Install regardless of conflicts"}
+      ],
+      "args": [{"name": "package", "variadic": true, "source": {"type": "none"}}]
+    },
+    {
+      "name": "run",
+      "aliases": ["run-script"],
+      "description": "Run a script from package.json",
+      "args": [{"name": "script", "source": {"type": "provider", "name": "npm.scripts"}},
+               {"name": "args", "variadic": true, "source": {"type": "none"}}]
+    },
+    {"name": "uninstall", "aliases": ["remove", "rm"], "description": "Remove a dependency",
+     "args": [{"name": "package", "variadic": true,
+               "source": {"type": "provider", "name": "npm.dependencies"}}]},
+    {"name": "update", "aliases": ["up"], "description": "Update dependencies",
+     "args": [{"name": "package", "variadic": true,
+               "source": {"type": "provider", "name": "npm.dependencies"}}]},
+    {"name": "test", "description": "Run the test script"},
+    {"name": "start", "description": "Run the start script"},
+    {"name": "stop", "description": "Run the stop script"},
+    {"name": "restart", "description": "Restart the package"},
+    {"name": "init", "description": "Create a package.json",
+     "options": [{"names": ["-y", "--yes"], "description": "Accept every default"}]},
+    {"name": "list", "aliases": ["ls"], "description": "List installed packages",
+     "options": [{"names": ["--depth"], "description": "How deep to recurse",
+                  "value": {"type": "none"}}]},
+    {"name": "outdated", "description": "Show packages with newer versions"},
+    {"name": "audit", "description": "Report known vulnerabilities",
+     "subcommands": [{"name": "fix", "description": "Install compatible fixed versions"}]},
+    {"name": "publish", "description": "Publish the package",
+     "options": [{"names": ["--access"], "description": "Registry visibility",
+                  "value": {"type": "values", "items": ["public", "restricted"]}},
+                 {"names": ["--dry-run"], "description": "Report without publishing"}]},
+    {"name": "version", "description": "Bump the package version",
+     "args": [{"name": "increment", "source": {"type": "values", "items": [
+       {"value": "patch", "description": "0.0.x"},
+       {"value": "minor", "description": "0.x.0"},
+       {"value": "major", "description": "x.0.0"}
+     ]}}]},
+    {"name": "link", "description": "Symlink a package directory"},
+    {"name": "pack", "description": "Create a tarball from the package"},
+    {"name": "ci", "description": "Clean install from the lockfile"},
+    {"name": "exec", "description": "Run a command from a package"},
+    {"name": "config", "description": "Manage the npm configuration",
+     "subcommands": [{"name": "get"}, {"name": "set"}, {"name": "delete"}, {"name": "list"}]},
+    {"name": "cache", "description": "Manage the npm cache",
+     "subcommands": [{"name": "clean"}, {"name": "verify"}]},
+    {"name": "login", "description": "Authenticate with a registry"},
+    {"name": "logout", "description": "Log out of a registry"},
+    {"name": "whoami", "description": "Show the logged-in user"}
+  ]
+}

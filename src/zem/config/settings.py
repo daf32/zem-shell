@@ -70,6 +70,18 @@ class ColorScheme(BaseModel):
 class VenvScheme(BaseModel):
     auto: bool = True
 
+class HintsSettings(BaseModel):
+    """Declarative completion hints (`zem.hints`)."""
+
+    enable: bool = True
+    #: Master switch for sources that shell out or call a provider. Turning
+    #: it off keeps the static parts of every spec working.
+    dynamic: bool = True
+    #: Ceiling for a spec's own `timeout_ms` / `cache_ttl_ms`.
+    command_timeout_ms: int = Field(default=300, ge=1, le=2000)
+    cache_ttl_ms: int = Field(default=2000, ge=0, le=600_000)
+    user_dir: str = "~/.zem/hints"
+
 def format_validation_error(error) -> list[str]:
     """``loc: msg`` lines for a pydantic ``ValidationError``."""
     lines = []
@@ -110,6 +122,7 @@ class AppConfig(BaseSettings):
     colors: ColorScheme = Field(default_factory=ColorScheme)
     active_theme: str = "default"
     venv: VenvScheme = Field(default_factory=VenvScheme)
+    hints: HintsSettings = Field(default_factory=HintsSettings)
     plugins: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("operators")

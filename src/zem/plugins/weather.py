@@ -2,35 +2,13 @@
 import json
 import urllib.parse
 import urllib.request
-from typing import TYPE_CHECKING, Iterable, List
-
-from prompt_toolkit.completion import Completion
+from typing import TYPE_CHECKING
 
 from zem.builtins.base import BaseCommand
-from zem.ui.completers.base import BaseArgCompleter
 
 if TYPE_CHECKING:
-    from prompt_toolkit.document import Document
 
     from zem.core.context import ExecutionContext
-
-class WeatherCompleter(BaseArgCompleter):
-    """Suggests cities from a predefined list or history."""
-    
-    CITIES = [
-        "London", "New York", "Tokyo", "Paris", "Berlin", "Moscow", 
-        "Dubai", "Singapore", "Barcelona", "Madrid", "Rome", 
-        "Toronto", "Sydney", "Mumbai", "Beijing", "San Francisco"
-    ]
-
-    def get_completions(
-        self, document: "Document", parts: List[str], word_before: str
-    ) -> Iterable[Completion]:
-        # weather [CITY]
-        if len(parts) >= 1:
-            for city in self.CITIES:
-                if city.lower().startswith(word_before.lower()):
-                    yield Completion(city, start_position=-len(word_before))
 
 class WeatherCommand(BaseCommand):
     name = "weather"
@@ -41,9 +19,6 @@ class WeatherCommand(BaseCommand):
     API_URL = "https://api.open-meteo.com/v1/forecast"
     GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
     HTTP_TIMEOUT = 10  # seconds; the shell prompt blocks on this
-
-    def get_completer(self):
-        return WeatherCompleter()
 
     def get_default_config(self) -> dict:
         return {

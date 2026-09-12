@@ -274,6 +274,11 @@ class Shell:
             auto_suggest=auto_suggest,
             style=self.style,
             complete_while_typing=True,
+            # Hint specs may shell out (git branches, docker containers).
+            # On the event loop thread that would freeze rendering on every
+            # keystroke; in a worker it is also cancelled when the next one
+            # arrives.
+            complete_in_thread=True,
             key_bindings=kb
         )
 

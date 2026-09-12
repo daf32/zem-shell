@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "command": "config",
+  "description": "Read and write the shell configuration",
+  "fallback": "none",
+  "subcommands": [
+    {"name": "list", "description": "List every configuration value"},
+    {"name": "get", "description": "Read one value",
+     "args": [{"name": "key", "source": {"type": "provider", "name": "zem.config_keys"}}]},
+    {"name": "set", "description": "Write one value",
+     "args": [{"name": "key", "source": {"type": "provider", "name": "zem.config_keys"}},
+              {"name": "value", "source": {"type": "none"}}]},
+    {"name": "unset", "description": "Remove one value",
+     "args": [{"name": "key", "source": {"type": "provider", "name": "zem.config_keys"}}]},
+    {"name": "reload", "description": "Re-read the configuration file"},
+    {"name": "path", "description": "Show the configuration file path"},
+    {"name": "edit", "description": "Open the configuration in an editor"}
+  ]
+}

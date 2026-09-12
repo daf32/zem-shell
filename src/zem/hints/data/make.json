@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "command": "make",
+  "description": "Build targets from a Makefile",
+  "fallback": "files",
+  "options": [
+    {"names": ["-j", "--jobs"], "description": "Parallel jobs", "value": {"type": "none"}},
+    {"names": ["-f", "--file"], "description": "Makefile to use", "value": {"type": "files"}},
+    {"names": ["-C", "--directory"], "description": "Change directory first",
+     "value": {"type": "dirs"}},
+    {"names": ["-n", "--dry-run"], "description": "Print commands without running them"},
+    {"names": ["-k", "--keep-going"], "description": "Carry on after an error"},
+    {"names": ["-B", "--always-make"], "description": "Rebuild unconditionally"},
+    {"names": ["-s", "--silent"], "description": "Do not echo commands"}
+  ],
+  "args": [{"name": "target", "variadic": true, "description": "Target to build",
+            "source": {"type": "provider", "name": "make.targets"}}]
+}

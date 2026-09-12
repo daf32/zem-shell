@@ -32,9 +32,16 @@ Zem is a modular Python-based shell focused on extensibility and speed.
 - **Variables done right**: `set NAME v` is shell-local, `export NAME` promotes it;
   children only see exported variables.
 
-- **UI**: syntax highlighting, tab completion (commands, paths, `git`/`pip`/`docker`/`npm`
-  arguments), fish-style ghost-text suggestions from history, Ctrl-R fuzzy history
-  search, themes (`theme list`), git/venv/exit-code/duration in the prompt.
+- **UI**: syntax highlighting, fish-style ghost-text suggestions from history,
+  Ctrl-R fuzzy history search, themes (`theme list`), git/venv/exit-code/duration
+  in the prompt.
+
+- **Completion that knows your tools**: `git checkout <TAB>` lists your branches,
+  `git push <TAB>` your remotes, `docker exec <TAB>` your running containers,
+  `npm run <TAB>` the scripts in `package.json`, `make <TAB>` your targets. Ships
+  with specs for git, docker, npm, pip, uv, kubectl, brew, gh, ssh, make and go —
+  and a spec is just JSON, so adding your own tool means dropping a file in
+  `~/.zem/hints/`. See [docs/HINT_SPECS.md](docs/HINT_SPECS.md).
 
 - **Configuration**: one validated JSON file (`config set` refuses values the shell
   could not start with), `~/.zemrc`, plugins in `~/.zem/plugins/`.
@@ -179,7 +186,7 @@ class HelloCommand(BaseCommand):
 
 The shell will automatically detect and register your command on the next launch.
 See `docs/COMMAND_DEVELOPMENT.md` for the full API (exit codes, streams, variables,
-completion, plugin config). User plugins go in `~/.zem/plugins/`.
+completion, plugin config). User plugins go in `~/.zem/plugins/`, completion specs in `~/.zem/hints/`.
 
 Run the tests with `uv run pytest`; lint with `uv run ruff check .`.
 

@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "command": "docker",
+  "description": "Container runtime CLI",
+  "fallback": "files",
+  "options": [
+    {"names": ["-H", "--host"], "description": "Daemon socket to connect to",
+     "inherited": true, "value": {"type": "none"}},
+    {"names": ["--context"], "description": "Context to use", "inherited": true,
+     "value": {"type": "command",
+               "run": ["docker", "context", "ls", "--format", "{{.Name}}"],
+               "cache_scope": "global", "cache_ttl_ms": 30000, "timeout_ms": 800}},
+    {"names": ["--version"], "description": "Print the docker version"}
+  ],
+  "subcommands": [
+    {
+      "name": "run",
+      "description": "Create and run a new container",
+      "options": [
+        {"names": ["-d", "--detach"], "description": "Run in the background"},
+        {"names": ["-i", "--interactive"], "description": "Keep STDIN open"},
+        {"names": ["-t", "--tty"], "description": "Allocate a pseudo-TTY"},
+        {"names": ["--rm"], "description": "Remove the container when it exits"},
+        {"names": ["--name"], "description": "Name the container", "value": {"type": "none"}},
+        {"names": ["-p", "--publish"], "description": "Publish a port", "repeatable": true,
+         "value": {"type": "none"}},
+        {"names": ["-e", "--env"], "description": "Set an environment variable",
+         "repeatable": true, "value": {"type": "none"}},
+        {"names": ["-v", "--volume"], "description": "Bind mount a volume", "repeatable": true,
+         "value": {"type": "dirs"}},
+        {"names": ["-w", "--workdir"], "description": "Working directory inside the container",
+         "value": {"type": "none"}},
+        {"names": ["-u", "--user"], "description": "Run as this user", "value": {"type": "none"}},
+        {"names": ["--network"], "description": "Connect to a network",
+         "value": {"type": "command",
+                   "run": ["docker", "network", "ls", "--format", "{{.Name}}"],
+                   "cache_scope": "global", "cache_ttl_ms": 10000, "timeout_ms": 800}},
+        {"names": ["--entrypoint"], "description": "Override the entrypoint",
+         "value": {"type": "none"}}
+      ],
+      "args": [{"name": "image", "source": {"type": "provider", "name": "docker.images"}},
+               {"name": "command", "variadic": true, "source": {"type": "none"}}]
+    },
+    {
+      "name": "exec",
+      "description": "Run a command in a running container",
+      "options": [
+        {"names": ["-i", "--interactive"], "description": "Keep STDIN open"},
+        {"names": ["-t", "--tty"], "description": "Allocate a pseudo-TTY"},
+        {"names": ["-u", "--user"], "description": "Run as this user", "value": {"type": "none"}},
+        {"names": ["-w", "--workdir"], "description": "Working directory",
+         "value": {"type": "none"}},
+        {"names": ["-e", "--env"], "description": "Set an environment variable",
+         "repeatable": true, "value": {"type": "none"}}
+      ],
+      "args": [
+        {"name": "container",
+         "source": {"type": "provider", "name": "docker.containers_running"}},
+        {"name": "command", "variadic": true, "source": {"type": "commands"}}
+      ]
+    },
+    {
+      "name": "ps",
+      "description": "List containers",
+      "options": [
+        {"names": ["-a", "--all"], "description": "Stopped containers too"},
+        {"names": ["-q", "--quiet"], "description": "Only show IDs"},
+        {"names": ["--format"], "description": "Go template for the output",
+         "value": {"type": "none"}}
+      ]
+    },
+    {"name": "images", "description": "List images",
+     "options": [{"names": ["-q", "--quiet"], "description": "Only show IDs"},
+                 {"names": ["-a", "--all"], "description": "Intermediate images too"}]},
+    {"name": "logs", "description": "Fetch the logs of a container",
+     "options": [{"names": ["-f", "--follow"], "description": "Keep streaming"},
+                 {"names": ["--tail"], "description": "Lines from the end",
+                  "value": {"type": "none"}},
+                 {"names": ["-t", "--timestamps"], "description": "Show timestamps"}],
+     "args": [{"name": "container",
+               "source": {"type": "provider", "name": "docker.containers_all"}}]},
+    {"name": "stop", "description": "Stop running containers",
+     "args": [{"name": "container", "variadic": true,
+               "source": {"type": "provider", "name": "docker.containers_running"}}]},
+    {"name": "start", "description": "Start stopped containers",
+     "args": [{"name": "container", "variadic": true,
+               "source": {"type": "provider", "name": "docker.containers_all"}}]},
+    {"name": "restart", "description": "Restart containers",
+     "args": [{"name": "container", "variadic": true,
+               "source": {"type": "provider", "name": "docker.containers_all"}}]},
+    {"name": "rm", "description": "Remove containers",
+     "options": [{"names": ["-f", "--force"], "description": "Remove a running container"},
+                 {"names": ["-v", "--volumes"], "description": "Remove anonymous volumes too"}],
+     "args": [{"name": "container", "variadic": true,
+               "source": {"type": "provider", "name": "docker.containers_all"}}]},
+    {"name": "rmi", "description": "Remove images",
+     "options": [{"names": ["-f", "--force"], "description": "Force removal"}],
+     "args": [{"name": "image", "variadic": true,
+               "source": {"type": "provider", "name": "docker.images"}}]},
+    {"name": "build", "description": "Build an image from a Dockerfile",
+     "options": [{"names": ["-t", "--tag"], "description": "Name and tag the image",
+                  "value": {"type": "none"}},
+                 {"names": ["-f", "--file"], "description": "Dockerfile to use",
+                  "value": {"type": "files"}},
+                 {"names": ["--no-cache"], "description": "Ignore cached layers"},
+                 {"names": ["--build-arg"], "description": "Build-time variable",
+                  "repeatable": true, "value": {"type": "none"}}],
+     "args": [{"name": "context", "source": {"type": "dirs"}}]},
+    {"name": "pull", "description": "Download an image",
+     "args": [{"name": "image", "source": {"type": "none"}}]},
+    {"name": "push", "description": "Upload an image",
+     "args": [{"name": "image", "source": {"type": "provider", "name": "docker.images"}}]},
+    {"name": "inspect", "description": "Show low-level information",
+     "args": [{"name": "object", "variadic": true,
+               "source": {"type": "any_of", "sources": [
+                 {"type": "provider", "name": "docker.containers_all"},
+                 {"type": "provider", "name": "docker.images"}
+               ]}}]},
+    {
+      "name": "container",
+      "description": "Manage containers",
+      "subcommands": [
+        {"name": "ls", "aliases": ["ps"], "description": "List containers",
+         "options": [{"names": ["-a", "--all"], "description": "Stopped containers too"}]},
+        {"name": "rm", "description": "Remove containers",
+         "options": [{"names": ["-f", "--force"], "description": "Remove a running container"}],
+         "args": [{"name": "container", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.containers_all"}}]},
+        {"name": "logs", "description": "Fetch container logs",
+         "options": [{"names": ["-f", "--follow"], "description": "Keep streaming"}],
+         "args": [{"name": "container",
+                   "source": {"type": "provider", "name": "docker.containers_all"}}]},
+        {"name": "prune", "description": "Remove stopped containers"},
+        {"name": "stats", "description": "Live resource usage"},
+        {"name": "inspect", "description": "Show low-level information",
+         "args": [{"name": "container", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.containers_all"}}]}
+      ]
+    },
+    {
+      "name": "image",
+      "description": "Manage images",
+      "subcommands": [
+        {"name": "ls", "description": "List images"},
+        {"name": "rm", "description": "Remove images",
+         "args": [{"name": "image", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.images"}}]},
+        {"name": "prune", "description": "Remove unused images",
+         "options": [{"names": ["-a", "--all"], "description": "Not just dangling ones"}]},
+        {"name": "pull", "description": "Download an image"},
+        {"name": "build", "description": "Build an image",
+         "args": [{"name": "context", "source": {"type": "dirs"}}]}
+      ]
+    },
+    {
+      "name": "volume", "description": "Manage volumes",
+      "subcommands": [
+        {"name": "ls"}, {"name": "create"}, {"name": "prune"},
+        {"name": "rm", "args": [{"name": "volume", "variadic": true,
+                                 "source": {"type": "command",
+                                            "run": ["docker", "volume", "ls", "-q"],
+                                            "cache_scope": "global", "timeout_ms": 800}}]}
+      ]
+    },
+    {
+      "name": "network", "description": "Manage networks",
+      "subcommands": [
+        {"name": "ls"}, {"name": "create"}, {"name": "prune"},
+        {"name": "inspect", "args": [{"name": "network", "variadic": true,
+                                      "source": {"type": "command",
+                                                 "run": ["docker", "network", "ls",
+                                                         "--format", "{{.Name}}"],
+                                                 "cache_scope": "global",
+                                                 "timeout_ms": 800}}]}
+      ]
+    },
+    {
+      "name": "compose",
+      "description": "Define and run multi-container applications",
+      "options": [
+        {"names": ["-f", "--file"], "description": "Compose file", "inherited": true,
+         "value": {"type": "files", "extensions": [".yml", ".yaml"]}},
+        {"names": ["-p", "--project-name"], "description": "Project name", "inherited": true,
+         "value": {"type": "none"}}
+      ],
+      "subcommands": [
+        {"name": "up", "description": "Create and start containers",
+         "options": [{"names": ["-d", "--detach"], "description": "Run in the background"},
+                     {"names": ["--build"], "description": "Build images first"},
+                     {"names": ["--force-recreate"], "description": "Recreate containers"}],
+         "args": [{"name": "service", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.compose_services"}}]},
+        {"name": "down", "description": "Stop and remove containers",
+         "options": [{"names": ["-v", "--volumes"], "description": "Remove named volumes too"}]},
+        {"name": "logs", "description": "View output from containers",
+         "options": [{"names": ["-f", "--follow"], "description": "Keep streaming"}],
+         "args": [{"name": "service", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.compose_services"}}]},
+        {"name": "ps", "description": "List containers"},
+        {"name": "build", "description": "Build service images",
+         "args": [{"name": "service", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.compose_services"}}]},
+        {"name": "restart", "description": "Restart services",
+         "args": [{"name": "service", "variadic": true,
+                   "source": {"type": "provider", "name": "docker.compose_services"}}]},
+        {"name": "exec", "description": "Run a command in a service",
+         "args": [{"name": "service",
+                   "source": {"type": "provider", "name": "docker.compose_services"}},
+                  {"name": "command", "variadic": true, "source": {"type": "commands"}}]},
+        {"name": "pull", "description": "Pull service images"},
+        {"name": "config", "description": "Parse and render the compose file"}
+      ]
+    },
+    {"name": "system", "description": "Manage docker itself",
+     "subcommands": [{"name": "df"}, {"name": "prune"}, {"name": "info"}, {"name": "events"}]},
+    {"name": "cp", "description": "Copy files between a container and the host",
+     "args": [{"name": "source", "source": {"type": "files"}},
+              {"name": "destination", "source": {"type": "files"}}]},
+    {"name": "login", "description": "Log in to a registry"},
+    {"name": "logout", "description": "Log out of a registry"},
+    {"name": "tag", "description": "Tag an image",
+     "args": [{"name": "source", "source": {"type": "provider", "name": "docker.images"}},
+              {"name": "target", "source": {"type": "none"}}]}
+  ]
+}

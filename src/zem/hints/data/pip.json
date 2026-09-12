@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "command": "pip",
+  "aliases": ["pip3"],
+  "description": "Python package installer",
+  "fallback": "files",
+  "options": [
+    {"names": ["-q", "--quiet"], "description": "Less output", "inherited": true},
+    {"names": ["-v", "--verbose"], "description": "More output", "inherited": true},
+    {"names": ["--no-cache-dir"], "description": "Ignore the wheel cache", "inherited": true},
+    {"names": ["--version"], "description": "Print the pip version"}
+  ],
+  "subcommands": [
+    {
+      "name": "install",
+      "description": "Install packages",
+      "options": [
+        {"names": ["-U", "--upgrade"], "description": "Upgrade to the newest version"},
+        {"names": ["-e", "--editable"], "description": "Install from a local source tree",
+         "value": {"type": "dirs"}},
+        {"names": ["-r", "--requirement"], "description": "Install from a requirements file",
+         "value": {"type": "files", "extensions": [".txt"]}},
+        {"names": ["-c", "--constraint"], "description": "Constrain versions",
+         "value": {"type": "files", "extensions": [".txt"]}},
+        {"names": ["-t", "--target"], "description": "Install into a directory",
+         "value": {"type": "dirs"}},
+        {"names": ["--user"], "description": "Install to the user site"},
+        {"names": ["--no-deps"], "description": "Skip dependencies"},
+        {"names": ["--force-reinstall"], "description": "Reinstall even if up to date"},
+        {"names": ["--pre"], "description": "Allow pre-release versions"},
+        {"names": ["--dry-run"], "description": "Report what would be installed"},
+        {"names": ["-i", "--index-url"], "description": "Base URL of the package index",
+         "value": {"type": "none"}}
+      ],
+      "args": [{"name": "package", "variadic": true, "source": {"type": "none"}}]
+    },
+    {
+      "name": "uninstall",
+      "description": "Remove packages",
+      "options": [
+        {"names": ["-y", "--yes"], "description": "Do not ask for confirmation"},
+        {"names": ["-r", "--requirement"], "description": "Uninstall what a file lists",
+         "value": {"type": "files", "extensions": [".txt"]}}
+      ],
+      "args": [{"name": "package", "variadic": true,
+                "source": {"type": "provider", "name": "pip.packages"}}]
+    },
+    {
+      "name": "list",
+      "description": "List installed packages",
+      "options": [
+        {"names": ["-o", "--outdated"], "description": "Only packages with newer versions"},
+        {"names": ["-u", "--uptodate"], "description": "Only up-to-date packages"},
+        {"names": ["--format"], "description": "Output format",
+         "value": {"type": "values", "items": ["columns", "freeze", "json"]}}
+      ]
+    },
+    {"name": "show", "description": "Show package details",
+     "options": [{"names": ["-f", "--files"], "description": "List installed files"}],
+     "args": [{"name": "package", "variadic": true,
+               "source": {"type": "provider", "name": "pip.packages"}}]},
+    {"name": "freeze", "description": "Output installed packages in requirements format",
+     "options": [{"names": ["-l", "--local"], "description": "Skip globally installed packages"}]},
+    {"name": "download", "description": "Download packages without installing",
+     "options": [{"names": ["-d", "--dest"], "description": "Download into this directory",
+                  "value": {"type": "dirs"}}],
+     "args": [{"name": "package", "variadic": true, "source": {"type": "none"}}]},
+    {"name": "wheel", "description": "Build wheels",
+     "args": [{"name": "package", "variadic": true, "source": {"type": "none"}}]},
+    {"name": "check", "description": "Verify installed packages have compatible dependencies"},
+    {"name": "config", "description": "Manage the pip configuration",
+     "subcommands": [
+       {"name": "list"}, {"name": "get"}, {"name": "set"}, {"name": "unset"}, {"name": "edit"}
+     ]},
+    {"name": "cache", "description": "Inspect and manage the wheel cache",
+     "subcommands": [
+       {"name": "dir"}, {"name": "info"}, {"name": "list"}, {"name": "remove"}, {"name": "purge"}
+     ]},
+    {"name": "search", "description": "Search PyPI",
+     "args": [{"name": "query", "source": {"type": "none"}}]},
+    {"name": "hash", "description": "Compute hashes of package archives",
+     "args": [{"name": "file", "variadic": true, "source": {"type": "files"}}]}
+  ]
+}
