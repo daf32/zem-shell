@@ -42,6 +42,7 @@ class Shell:
         config: Optional[AppConfig] = None,
         headless: bool = False,
         user_plugins_dir: str | None = DEFAULT_USER_PLUGINS_DIR,
+        load_rc: bool = True,
     ):
         """Construct a shell instance.
 
@@ -56,6 +57,11 @@ class Shell:
         ``user_plugins_dir`` is where external plugins are imported from
         (``~/.zem/plugins`` by default); ``None`` disables them. Only
         consulted when ``commands`` is ``None``.
+
+        ``load_rc=False`` skips ``~/.zemrc``. Non-interactive runs
+        (``zem -c``) do this, like every other shell: a script should
+        behave the same on a machine whose owner has never customised
+        anything.
         """
         self.config = config or AppConfig()
         self.context = ExecutionContext()
@@ -80,10 +86,10 @@ class Shell:
             self._setup_prompt_session()
             self._setup_signal_handlers()
 
-        if self.config.rc.auto_create and not os.path.exists(self.rc_file):
-            self._create_default_rc()
-
-        self._load_rc_file()
+        if load_rc:
+            if self.config.rc.auto_create and not os.path.exists(self.rc_file):
+                self._create_default_rc()
+            self._load_rc_file()
 
         if self.config.venv.auto:
             activate_venv(self.context)

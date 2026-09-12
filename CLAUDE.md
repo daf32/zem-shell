@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Zem is a modular Python shell (Python ≥ 3.13) built on `prompt-toolkit` and `pydantic-settings`. The entry point is `zem`, defined in `pyproject.toml` and resolving to `zem.main:main`. Dependency management is done with `uv`.
 
+## CLI
+
+`zem` starts an interactive session; `zem -c "cmd"`, `zem file.zem` and a script
+on stdin run non-interactively through `Shell(headless=True, load_rc=False)`.
+`main()` returns an exit code (the console script exits with it) and rejects an
+unknown option instead of ignoring it. See `src/zem/main.py`.
+
 ## Releases
 
 Merging a PR into `main` releases it, and the PR's **branch name** picks the
