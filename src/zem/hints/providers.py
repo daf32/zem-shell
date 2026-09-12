@@ -401,6 +401,14 @@ def _zem_plugins(ctx: SourceContext) -> list[Suggestion]:
     ]
 
 
+@provider("zem.plugin_packages")
+def _zem_plugin_packages(ctx: SourceContext) -> list[Suggestion]:
+    """Installed distributions that provide a plugin, for `plugin remove`."""
+    from zem.plugin.installer import installed_distributions
+
+    return [Suggestion(name, version) for name, version in installed_distributions()]
+
+
 @provider("zem.themes")
 def _zem_themes(ctx: SourceContext) -> list[Suggestion]:
     from zem.config.settings import AppConfig
