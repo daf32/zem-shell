@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.11.3] - 2026-09-12
 ### Added
 - `plugin install` / `plugin remove` / `plugin packages`. Installing detects
   how Zem itself was installed (`uv tool`, `pipx`, or a virtualenv) and runs
