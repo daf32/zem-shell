@@ -3,17 +3,20 @@ from typing import Iterable, List, Set
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 
-from zem.core.scan import NORMAL, scan
+from zem.core.scan import NORMAL, scan, split_words, word_at
 from zem.ui.completers.defaults import (
     DockerCompleter,
     EnhancedPathCompleter,
     GitCompleter,
     NpmCompleter,
     PipCompleter,
-    _current_word,
 )
 from zem.ui.completers.registry import CompleterRegistry
 from zem.utils.executables import get_system_commands, refresh_system_commands
+
+#: An alias may resolve to another alias; stop long before a cycle burns the
+#: keystroke budget.
+_MAX_ALIAS_DEPTH = 10
 
 
 class ZemCompleter(Completer):
@@ -77,6 +80,27 @@ class ZemCompleter(Completer):
             i += 1
         return start
 
+    def _expand_alias(self, values: List[str]) -> List[str]:
+        """Replace a leading alias with what it stands for.
+
+        `alias gs='git status'` means that in `gs <TAB>` the user is already
+        inside `git status`; expanding only the head word (as this used to)
+        offered git's subcommands instead.
+        """
+        aliases = self.shell.context.aliases
+        ops = self.shell.config.operators
+        head, rest = values[:1], values[1:]
+        seen: Set[str] = set()
+        depth = 0
+        while head and head[0] in aliases and head[0] not in seen and depth < _MAX_ALIAS_DEPTH:
+            seen.add(head[0])
+            expanded = [w.value for w in split_words(aliases[head[0]], ops)]
+            if not expanded:
+                break
+            head = expanded
+            depth += 1
+        return head + rest
+
     def get_completions(
         self, document: Document, complete_event: CompleteEvent
     ) -> Iterable[Completion]:
@@ -84,30 +108,21 @@ class ZemCompleter(Completer):
         text_before = document.text_before_cursor
 
         cmd_start = self._find_command_start(text_before)
-        current_segment = text_before[cmd_start:]
-        stripped_segment = current_segment.lstrip()
-        parts = stripped_segment.split()
+        segment = text_before[cmd_start:]
+        words, cursor_index = word_at(segment, self.shell.config.operators)
 
-        is_command_position = (
-            not stripped_segment
-            or (len(parts) == 1 and not current_segment[-1].isspace())
-        )
-        word_before = document.get_word_before_cursor()
-
-        if is_command_position:
+        if not words or cursor_index == 0:
             # Use the whole first word: prompt_toolkit's "word" stops at
             # `-`, which would turn `docker-com` into a prefix of `com`.
-            yield from self._complete_command_name(parts[0] if parts else "")
+            yield from self._complete_command_name(words[0].text if words else "")
             return
 
-        current_cmd_name = parts[0] if parts else ""
-        resolved_cmd = current_cmd_name
-        if current_cmd_name in self.shell.context.aliases:
-            alias_parts = self.shell.context.aliases[current_cmd_name].split()
-            if alias_parts:
-                resolved_cmd = alias_parts[0]
+        # The word under the cursor, quotes and all. `get_word_before_cursor()`
+        # would cut it at the dash and hand a `--upgrade` completer `upgrade`.
+        word_before = words[cursor_index].text if cursor_index >= 0 else ""
+        parts = self._expand_alias([w.value for w in words])
 
-        completer = self.registry.get(resolved_cmd)
+        completer = self.registry.get(parts[0] if parts else "")
         if completer is not None:
             produced = False
             for completion in completer.get_completions(document, parts, word_before):
@@ -116,7 +131,7 @@ class ZemCompleter(Completer):
             if (
                 produced
                 or not getattr(completer, "fallback_to_paths", True)
-                or _current_word(text_before).startswith("-")
+                or word_before.startswith("-")
             ):
                 return
             # Nothing specific to offer: fall through to paths, so e.g.
@@ -127,17 +142,17 @@ class ZemCompleter(Completer):
     def _complete_command_name(self, prefix: str) -> Iterable[Completion]:
         """Complete command names (builtins, aliases, system commands)."""
         seen: Set[str] = set()
-        
+
         # Builtin commands (highest priority)
         for cmd in sorted(self.shell.commands.keys()):
             if cmd.startswith(prefix) and cmd not in seen:
                 seen.add(cmd)
                 yield Completion(
-                    cmd, 
+                    cmd,
                     start_position=-len(prefix),
                     display_meta="builtin"
                 )
-        
+
         # Aliases
         for alias in sorted(self.shell.context.aliases.keys()):
             if alias.startswith(prefix) and alias not in seen:
@@ -146,16 +161,16 @@ class ZemCompleter(Completer):
                 # Truncate long alias values for display
                 display_value = alias_value if len(alias_value) <= 30 else alias_value[:27] + "..."
                 yield Completion(
-                    alias, 
+                    alias,
                     start_position=-len(prefix),
                     display_meta=f"alias → {display_value}"
                 )
-        
+
         # System commands
         for cmd in sorted(self.system_commands):
             if cmd.startswith(prefix) and cmd not in seen:
                 seen.add(cmd)
                 yield Completion(
-                    cmd, 
+                    cmd,
                     start_position=-len(prefix)
                 )

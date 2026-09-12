@@ -107,3 +107,31 @@ def test_path_completion_inserts_only_the_remainder(tmp_path, monkeypatch, compl
     doc = Document("ls some", 7)
     comp = next(c for c in completer.get_completions(doc, CompleteEvent()))
     assert comp.text == "file.txt" and comp.start_position == 0
+
+
+def test_flag_prefix_with_dashes_completes(completer):
+    # `get_word_before_cursor()` cuts at the dash, so this used to yield
+    # nothing at all: neither the flag nor the path fallback.
+    assert _complete(completer, "pip install --upgr") == ["--upgrade"]
+    assert "--detach" in _complete(completer, "docker run --de")
+
+
+def test_flag_completion_replaces_the_whole_word(completer):
+    doc = Document("pip install --upgr", 18)
+    comp = next(iter(completer.get_completions(doc, CompleteEvent())))
+    assert comp.text == "--upgrade" and comp.start_position == -6
+
+
+def test_alias_expands_to_all_of_its_words(completer, full_shell):
+    # `gs ` means the user is inside `git status`, not at git's subcommand
+    # position -- so no subcommand of git may be offered here.
+    full_shell.context.aliases["gs"] = "git status"
+    assert "checkout" not in _complete(completer, "gs ")
+
+
+def test_quoted_argument_counts_as_one_word(tmp_path, monkeypatch, completer):
+    (tmp_path / "somefile.txt").write_text("")
+    monkeypatch.chdir(tmp_path)
+    # `-m "a b"` is three words; splitting on blanks made it four and shifted
+    # every argument index after it.
+    assert "file.txt" in _complete(completer, 'git commit -m "a b" some')
