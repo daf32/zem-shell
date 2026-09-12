@@ -13,6 +13,19 @@ on stdin run non-interactively through `Shell(headless=True, load_rc=False)`.
 `main()` returns an exit code (the console script exits with it) and rejects an
 unknown option instead of ignoring it. See `src/zem/main.py`.
 
+## Releases
+
+Merging a PR into `main` releases it, and the PR's **branch name** picks the
+bump (`.github/workflows/version-bump.yml`): `patch/` is the default however
+big the change, `minor/` marks a whole roadmap stage being finished, `major/`
+a milestone release. Any other prefix (`docs/`, `ci/`, `chore/`) releases
+nothing. Never edit `version` in `pyproject.toml` by hand.
+
+Write user-facing changes into the `## [Unreleased]` section of `CHANGELOG.md`;
+the workflow renames it to the new version. When a branch is rebased after
+someone else's release, check that the entry did not land inside the section
+that release just closed.
+
 ## Common commands
 
 ```bash

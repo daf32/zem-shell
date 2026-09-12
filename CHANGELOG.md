@@ -20,6 +20,21 @@ All notable changes to Zem are documented here. The format follows
 
 
 ## [0.11.0] - 2026-09-12
+### Added
+- **`hints` command and a spec registry.** The wheel ships specs only for
+  tools almost everyone has; the rest are fetched on demand with
+  `hints search` / `hints install` / `hints update` / `hints remove`, which
+  verify each download's checksum and validate it before writing to
+  `~/.zem/hints/`. `hints list`, `hints show <command>`, `hints validate` and
+  `hints providers` cover inspection and writing your own. The default
+  registry is [daf32/zem-hints](https://github.com/daf32/zem-hints); point
+  `hints.registry_url` at your own if you like.
+
+### Changed
+- Specs for `kubectl`, `brew`, `gh` and `go` no longer ship in the wheel:
+  they live in the [spec registry](https://github.com/daf32/zem-hints) and
+  install on demand, so they reach you without waiting for a Zem release.
+
 ## [0.10.0] - 2026-09-12
 ### Added
 - **Declarative completion hints.** Argument completion is now driven by JSON
@@ -34,17 +49,9 @@ All notable changes to Zem are documented here. The format follows
   `~/.zem/hints/` to add your own tool or replace a bundled spec — see
   `docs/HINT_SPECS.md`. New config section `hints`, including
   `hints.dynamic = false` to stop specs shelling out entirely.
+  (`kubectl`, `brew`, `gh` and `go` moved to the registry in 0.11.0.)
 - Completion now runs on a worker thread, so a spec that shells out cannot
   stall the prompt.
-- **`hints` command and a spec registry.** The wheel ships specs only for
-  tools almost everyone has; the rest are fetched on demand with
-  `hints search` / `hints install` / `hints update` / `hints remove`, which
-  verify each download's checksum and validate it before writing to
-  `~/.zem/hints/`. `hints list`, `hints show <command>`, `hints validate` and
-  `hints providers` cover inspection and writing your own. The default
-  registry is [daf32/zem-hints](https://github.com/daf32/zem-hints); point
-  `hints.registry_url` at your own if you like.
-
 ### Fixed
 - Flags with a typed prefix complete again. `pip install --upg<TAB>` produced
   nothing at all: the word under the cursor was cut at the dash, so no flag
