@@ -145,3 +145,17 @@ def _isolate_command_registry():
     CommandRegistry._command_classes.update(classes)
     CommandRegistry._commands.clear()
     CommandRegistry._commands.update(instances)
+
+
+@pytest.fixture(autouse=True)
+def _no_hint_subprocess(monkeypatch):
+    """Hint specs must not shell out during the suite.
+
+    Otherwise a `git checkout <TAB>` test would depend on whether tmp_path
+    happens to sit inside a repository, and on git being installed at all.
+    Tests that exercise dynamic sources live in `tests/hints/`, which
+    overrides this fixture.
+    """
+    from zem.hints import sources
+
+    monkeypatch.setattr(sources, "run_command", lambda source, ctx: ())

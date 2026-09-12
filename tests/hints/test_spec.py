@@ -102,3 +102,14 @@ def test_any_of_nests_sources():
         ]},
     }]))
     assert [s.type for s in spec.args[0].source.sources] == ["provider", "files"]
+
+
+def test_go_templates_are_not_placeholders():
+    # `docker ps --format {{.Names}}` is how these tools give machine-readable
+    # output; only a single-braced `{word}` is a template hole.
+    spec = parse_spec(_spec(args=[{
+        "name": "container",
+        "source": {"type": "command",
+                   "run": ["docker", "ps", "--format", "{{.Names}}\t{{.Image}}"]},
+    }]))
+    assert spec.args[0].source.run[-1].startswith("{{")

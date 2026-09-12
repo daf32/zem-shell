@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
@@ -10,6 +11,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 #: declaring a higher version is refused with a clear message instead of
 #: being half-understood.
 CURRENT_SCHEMA_VERSION = 1
+
+#: A single-braced `{word}` is a template hole. Doubled braces are not: Go
+#: templates (`docker ps --format {{.Names}}`, `kubectl -o go-template`) are
+#: how half the tools worth completing ask for machine-readable output.
+_PLACEHOLDER = re.compile(r"(?<!\{)\{[^{}]*\}(?!\})")
 
 
 class SpecError(ValueError):
@@ -103,7 +109,7 @@ class CommandSource(_Model):
         # injection vector. Anything that needs the current input writes a
         # provider instead, where the code is reviewable.
         for arg in value:
-            if "{" in arg and "}" in arg:
+            if _PLACEHOLDER.search(arg):
                 raise ValueError(
                     f"placeholders are not supported in `run` ({arg!r}); "
                     "use a named provider for input-dependent values"

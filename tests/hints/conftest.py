@@ -56,3 +56,9 @@ def fake_run(monkeypatch):
 
     _install.calls = calls
     return _install
+
+
+@pytest.fixture(autouse=True)
+def _no_hint_subprocess():
+    """Undo the suite-wide stub: these tests drive sources on purpose."""
+    yield

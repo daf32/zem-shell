@@ -1,0 +1,381 @@
+{
+  "schema_version": 1,
+  "command": "git",
+  "description": "Distributed version control",
+  "fallback": "files",
+  "options": [
+    {"names": ["-C"], "description": "Run as if started in <path>", "inherited": true,
+     "value": {"type": "dirs"}},
+    {"names": ["--no-pager"], "description": "Do not pipe output into a pager", "inherited": true},
+    {"names": ["--version"], "description": "Print the git version"},
+    {"names": ["-h", "--help"], "description": "Show help", "inherited": true}
+  ],
+  "subcommands": [
+    {
+      "name": "add",
+      "description": "Add file contents to the index",
+      "options": [
+        {"names": ["-A", "--all"], "description": "Stage every change"},
+        {"names": ["-p", "--patch"], "description": "Choose hunks interactively"},
+        {"names": ["-u", "--update"], "description": "Only already-tracked files"},
+        {"names": ["-n", "--dry-run"], "description": "Show what would be staged"},
+        {"names": ["-f", "--force"], "description": "Allow adding ignored files"}
+      ],
+      "args": [{"name": "pathspec", "variadic": true, "description": "Files to stage",
+                "source": {"type": "any_of", "sources": [
+                  {"type": "provider", "name": "git.dirty_files"},
+                  {"type": "files"}
+                ]}}]
+    },
+    {
+      "name": "status",
+      "description": "Show the working tree status",
+      "options": [
+        {"names": ["-s", "--short"], "description": "Short format"},
+        {"names": ["-b", "--branch"], "description": "Show the branch line"},
+        {"names": ["-u", "--untracked-files"], "description": "Show untracked files"}
+      ]
+    },
+    {
+      "name": "commit",
+      "description": "Record changes to the repository",
+      "options": [
+        {"names": ["-m", "--message"], "description": "Commit message",
+         "value": {"type": "none"}},
+        {"names": ["-a", "--all"], "description": "Stage every tracked file first"},
+        {"names": ["--amend"], "description": "Replace the previous commit"},
+        {"names": ["--no-verify"], "description": "Skip commit hooks"},
+        {"names": ["-F", "--file"], "description": "Read the message from a file",
+         "value": {"type": "files"}}
+      ],
+      "args": [{"name": "pathspec", "variadic": true,
+                "source": {"type": "any_of", "sources": [
+                  {"type": "provider", "name": "git.dirty_files"},
+                  {"type": "files"}
+                ]}}]
+    },
+    {
+      "name": "checkout",
+      "aliases": ["co"],
+      "description": "Switch branches or restore files",
+      "options": [
+        {"names": ["-b"], "description": "Create and switch to a new branch",
+         "value": {"type": "none"}},
+        {"names": ["-B"], "description": "Create or reset, then switch",
+         "value": {"type": "none"}},
+        {"names": ["-t", "--track"], "description": "Set upstream for the new branch"},
+        {"names": ["-f", "--force"], "description": "Throw away local changes"},
+        {"names": ["--detach"], "description": "Detach HEAD at the named commit"}
+      ],
+      "args": [{"name": "branch-or-path", "description": "Branch, commit or file",
+                "source": {"type": "any_of", "sources": [
+                  {"type": "provider", "name": "git.branches"},
+                  {"type": "files"}
+                ]}}]
+    },
+    {
+      "name": "switch",
+      "description": "Switch branches",
+      "options": [
+        {"names": ["-c", "--create"], "description": "Create a new branch",
+         "value": {"type": "none"}},
+        {"names": ["-d", "--detach"], "description": "Switch to a commit, detaching HEAD"},
+        {"names": ["--discard-changes"], "description": "Throw away local changes"}
+      ],
+      "args": [{"name": "branch",
+                "source": {"type": "provider", "name": "git.branches"}}]
+    },
+    {
+      "name": "branch",
+      "description": "List, create or delete branches",
+      "options": [
+        {"names": ["-d", "--delete"], "description": "Delete a merged branch"},
+        {"names": ["-D"], "description": "Delete a branch regardless"},
+        {"names": ["-m", "--move"], "description": "Rename a branch"},
+        {"names": ["-a", "--all"], "description": "List remote-tracking branches too"},
+        {"names": ["-r", "--remotes"], "description": "List remote-tracking branches"},
+        {"names": ["-v", "--verbose"], "description": "Show the tip commit"}
+      ],
+      "args": [{"name": "branch", "variadic": true,
+                "source": {"type": "provider", "name": "git.branches",
+                           "args": {"include_remotes": true}}}]
+    },
+    {
+      "name": "merge",
+      "description": "Join two development histories",
+      "options": [
+        {"names": ["--no-ff"], "description": "Always create a merge commit"},
+        {"names": ["--squash"], "description": "Squash the merged commits"},
+        {"names": ["--abort"], "description": "Abort the merge in progress"},
+        {"names": ["--continue"], "description": "Continue after resolving conflicts"},
+        {"names": ["-m"], "description": "Merge commit message", "value": {"type": "none"}}
+      ],
+      "args": [{"name": "branch", "variadic": true,
+                "source": {"type": "provider", "name": "git.branches",
+                           "args": {"include_remotes": true}}}]
+    },
+    {
+      "name": "rebase",
+      "description": "Reapply commits on top of another base",
+      "options": [
+        {"names": ["-i", "--interactive"], "description": "Edit the list of commits"},
+        {"names": ["--continue"], "description": "Continue after resolving conflicts"},
+        {"names": ["--abort"], "description": "Abort and reset HEAD"},
+        {"names": ["--skip"], "description": "Skip the current patch"},
+        {"names": ["--onto"], "description": "New base",
+         "value": {"type": "provider", "name": "git.branches"}}
+      ],
+      "args": [{"name": "upstream",
+                "source": {"type": "provider", "name": "git.branches",
+                           "args": {"include_remotes": true}}}]
+    },
+    {
+      "name": "push",
+      "description": "Update remote refs",
+      "options": [
+        {"names": ["-u", "--set-upstream"], "description": "Track the remote branch"},
+        {"names": ["-f", "--force"], "description": "Overwrite the remote branch"},
+        {"names": ["--force-with-lease"], "description": "Force, unless the remote moved"},
+        {"names": ["--tags"], "description": "Push tags as well"},
+        {"names": ["-n", "--dry-run"], "description": "Show what would be pushed"},
+        {"names": ["--delete"], "description": "Delete the named remote ref"}
+      ],
+      "args": [
+        {"name": "remote", "source": {"type": "provider", "name": "git.remotes"}},
+        {"name": "refspec", "source": {"type": "provider", "name": "git.branches"}}
+      ]
+    },
+    {
+      "name": "pull",
+      "description": "Fetch and integrate another repository",
+      "options": [
+        {"names": ["--rebase"], "description": "Rebase instead of merging"},
+        {"names": ["--ff-only"], "description": "Refuse anything but a fast-forward"},
+        {"names": ["--no-rebase"], "description": "Merge instead of rebasing"}
+      ],
+      "args": [
+        {"name": "remote", "source": {"type": "provider", "name": "git.remotes"}},
+        {"name": "branch", "source": {"type": "provider", "name": "git.branches"}}
+      ]
+    },
+    {
+      "name": "fetch",
+      "description": "Download objects and refs",
+      "options": [
+        {"names": ["--all"], "description": "Fetch every remote"},
+        {"names": ["-p", "--prune"], "description": "Remove stale remote refs"},
+        {"names": ["--tags"], "description": "Fetch tags as well"}
+      ],
+      "args": [{"name": "remote", "source": {"type": "provider", "name": "git.remotes"}}]
+    },
+    {
+      "name": "remote",
+      "description": "Manage tracked repositories",
+      "options": [{"names": ["-v", "--verbose"], "description": "Show remote URLs"}],
+      "subcommands": [
+        {"name": "add", "description": "Add a remote",
+         "args": [{"name": "name", "source": {"type": "none"}},
+                  {"name": "url", "source": {"type": "none"}}]},
+        {"name": "remove", "aliases": ["rm"], "description": "Remove a remote",
+         "args": [{"name": "name", "source": {"type": "provider", "name": "git.remotes"}}]},
+        {"name": "rename", "description": "Rename a remote",
+         "args": [{"name": "old", "source": {"type": "provider", "name": "git.remotes"}},
+                  {"name": "new", "source": {"type": "none"}}]},
+        {"name": "set-url", "description": "Change a remote's URL",
+         "args": [{"name": "name", "source": {"type": "provider", "name": "git.remotes"}},
+                  {"name": "url", "source": {"type": "none"}}]},
+        {"name": "show", "description": "Show information about a remote",
+         "args": [{"name": "name", "source": {"type": "provider", "name": "git.remotes"}}]},
+        {"name": "prune", "description": "Delete stale remote-tracking branches",
+         "args": [{"name": "name", "source": {"type": "provider", "name": "git.remotes"}}]}
+      ]
+    },
+    {
+      "name": "stash",
+      "description": "Set the dirty working tree aside",
+      "subcommands": [
+        {"name": "push", "description": "Save changes to a new stash",
+         "options": [
+           {"names": ["-m", "--message"], "description": "Stash message",
+            "value": {"type": "none"}},
+           {"names": ["-u", "--include-untracked"], "description": "Include untracked files"}
+         ]},
+        {"name": "pop", "description": "Apply a stash and drop it",
+         "args": [{"name": "stash", "source": {"type": "provider", "name": "git.stashes"}}]},
+        {"name": "apply", "description": "Apply a stash, keeping it",
+         "args": [{"name": "stash", "source": {"type": "provider", "name": "git.stashes"}}]},
+        {"name": "drop", "description": "Remove a stash",
+         "args": [{"name": "stash", "source": {"type": "provider", "name": "git.stashes"}}]},
+        {"name": "list", "description": "List the stash entries"},
+        {"name": "show", "description": "Show the changes in a stash",
+         "args": [{"name": "stash", "source": {"type": "provider", "name": "git.stashes"}}]},
+        {"name": "clear", "description": "Drop every stash entry"}
+      ]
+    },
+    {
+      "name": "log",
+      "description": "Show commit logs",
+      "options": [
+        {"names": ["--oneline"], "description": "One line per commit"},
+        {"names": ["--graph"], "description": "Draw the commit graph"},
+        {"names": ["--stat"], "description": "Show a diffstat"},
+        {"names": ["-n", "--max-count"], "description": "Limit the number of commits",
+         "value": {"type": "none"}},
+        {"names": ["--author"], "description": "Filter by author", "value": {"type": "none"}},
+        {"names": ["--since"], "description": "Commits newer than a date",
+         "value": {"type": "none"}},
+        {"names": ["--until"], "description": "Commits older than a date",
+         "value": {"type": "none"}}
+      ],
+      "args": [{"name": "revision-range",
+                "source": {"type": "provider", "name": "git.branches",
+                           "args": {"include_remotes": true}}}]
+    },
+    {
+      "name": "diff",
+      "description": "Show changes",
+      "options": [
+        {"names": ["--staged", "--cached"], "description": "Show staged changes"},
+        {"names": ["--stat"], "description": "Show a diffstat"},
+        {"names": ["--name-only"], "description": "Show only file names"},
+        {"names": ["-w", "--ignore-all-space"], "description": "Ignore whitespace"}
+      ],
+      "args": [{"name": "target", "variadic": true,
+                "source": {"type": "any_of", "sources": [
+                  {"type": "provider", "name": "git.branches"},
+                  {"type": "files"}
+                ]}}]
+    },
+    {
+      "name": "restore",
+      "description": "Restore working tree files",
+      "options": [
+        {"names": ["--staged"], "description": "Restore the index instead"},
+        {"names": ["-s", "--source"], "description": "Restore from this tree",
+         "value": {"type": "provider", "name": "git.branches"}}
+      ],
+      "args": [{"name": "pathspec", "variadic": true,
+                "source": {"type": "any_of", "sources": [
+                  {"type": "provider", "name": "git.dirty_files"},
+                  {"type": "files"}
+                ]}}]
+    },
+    {
+      "name": "reset",
+      "description": "Reset HEAD to a given state",
+      "options": [
+        {"names": ["--soft"], "description": "Keep the index and working tree"},
+        {"names": ["--mixed"], "description": "Reset the index only"},
+        {"names": ["--hard"], "description": "Discard every local change"}
+      ],
+      "args": [{"name": "commit",
+                "source": {"type": "provider", "name": "git.branches",
+                           "args": {"include_remotes": true}}}]
+    },
+    {
+      "name": "tag",
+      "description": "Create, list or delete tags",
+      "options": [
+        {"names": ["-a", "--annotate"], "description": "Create an annotated tag"},
+        {"names": ["-d", "--delete"], "description": "Delete a tag"},
+        {"names": ["-l", "--list"], "description": "List tags"},
+        {"names": ["-m", "--message"], "description": "Tag message", "value": {"type": "none"}}
+      ],
+      "args": [{"name": "tag", "source": {"type": "provider", "name": "git.tags"}}]
+    },
+    {
+      "name": "show",
+      "description": "Show an object",
+      "args": [{"name": "object",
+                "source": {"type": "any_of", "sources": [
+                  {"type": "provider", "name": "git.branches"},
+                  {"type": "provider", "name": "git.tags"}
+                ]}}]
+    },
+    {
+      "name": "cherry-pick",
+      "description": "Apply an existing commit",
+      "options": [
+        {"names": ["--continue"], "description": "Continue after resolving conflicts"},
+        {"names": ["--abort"], "description": "Cancel the operation"},
+        {"names": ["-n", "--no-commit"], "description": "Stage without committing"}
+      ],
+      "args": [{"name": "commit",
+                "source": {"type": "provider", "name": "git.branches"}}]
+    },
+    {
+      "name": "clone",
+      "description": "Clone a repository",
+      "options": [
+        {"names": ["--depth"], "description": "Shallow clone depth", "value": {"type": "none"}},
+        {"names": ["-b", "--branch"], "description": "Check out this branch",
+         "value": {"type": "none"}},
+        {"names": ["--recurse-submodules"], "description": "Clone submodules too"}
+      ],
+      "args": [{"name": "repository", "source": {"type": "none"}},
+               {"name": "directory", "source": {"type": "dirs"}}]
+    },
+    {
+      "name": "worktree",
+      "description": "Manage multiple working trees",
+      "subcommands": [
+        {"name": "add", "description": "Create a working tree",
+         "args": [{"name": "path", "source": {"type": "dirs"}},
+                  {"name": "branch", "source": {"type": "provider", "name": "git.branches"}}]},
+        {"name": "list", "description": "List working trees"},
+        {"name": "remove", "description": "Remove a working tree",
+         "args": [{"name": "path", "source": {"type": "dirs"}}]},
+        {"name": "prune", "description": "Prune stale working tree records"}
+      ]
+    },
+    {
+      "name": "bisect",
+      "description": "Binary-search for the commit that broke something",
+      "subcommands": [
+        {"name": "start", "description": "Start a bisect session"},
+        {"name": "good", "description": "Mark the commit as good"},
+        {"name": "bad", "description": "Mark the commit as bad"},
+        {"name": "skip", "description": "Skip the current commit"},
+        {"name": "reset", "description": "End the session"}
+      ]
+    },
+    {
+      "name": "clean",
+      "description": "Remove untracked files",
+      "options": [
+        {"names": ["-f", "--force"], "description": "Actually delete"},
+        {"names": ["-d"], "description": "Untracked directories too"},
+        {"names": ["-n", "--dry-run"], "description": "Show what would go"},
+        {"names": ["-x"], "description": "Ignored files as well"}
+      ]
+    },
+    {
+      "name": "blame",
+      "description": "Show what revision last touched each line",
+      "args": [{"name": "file", "source": {"type": "files"}}]
+    },
+    {
+      "name": "init", "description": "Create an empty repository",
+      "args": [{"name": "directory", "source": {"type": "dirs"}}]
+    },
+    {
+      "name": "config",
+      "description": "Get and set options",
+      "options": [
+        {"names": ["--global"], "description": "Use the user-wide config"},
+        {"names": ["--local"], "description": "Use the repository config"},
+        {"names": ["-l", "--list"], "description": "List every value"},
+        {"names": ["--unset"], "description": "Remove a value"}
+      ]
+    },
+    {
+      "name": "revert", "description": "Undo a commit with a new commit",
+      "args": [{"name": "commit", "source": {"type": "provider", "name": "git.branches"}}]
+    },
+    {"name": "rm", "description": "Remove files from the tree and the index",
+     "args": [{"name": "pathspec", "variadic": true, "source": {"type": "files"}}]},
+    {"name": "mv", "description": "Move or rename a file",
+     "args": [{"name": "source", "source": {"type": "files"}},
+              {"name": "destination", "source": {"type": "files"}}]}
+  ]
+}

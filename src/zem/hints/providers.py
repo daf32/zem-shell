@@ -158,18 +158,38 @@ def _docker_images(ctx: SourceContext) -> list[Suggestion]:
                 separator="\t", scope="global", ttl_ms=10_000, timeout_ms=800)
 
 
+@provider("docker.compose_services")
+def _docker_compose_services(ctx: SourceContext) -> list[Suggestion]:
+    return _run(ctx, ["docker", "compose", "config", "--services"],
+                ttl_ms=10_000, timeout_ms=1500)
+
+
 # --- node -----------------------------------------------------------------
+
+@provider("pip.packages")
+def _pip_packages(ctx: SourceContext) -> list[Suggestion]:
+    """Installed distributions, for `pip uninstall`/`pip show`."""
+    return _run(ctx, ["pip", "list", "--format=freeze", "--disable-pip-version-check"],
+                separator="==", ttl_ms=30_000, timeout_ms=1500, max_items=500)
+
+
+@provider("npm.dependencies")
+def _npm_dependencies(ctx: SourceContext) -> list[Suggestion]:
+    """Dependencies declared in package.json, for `npm uninstall`."""
+    data = _package_json(ctx)
+    out: list[Suggestion] = []
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        declared = data.get(section)
+        if isinstance(declared, dict):
+            out += [Suggestion(name, f"{version} ({section})")
+                    for name, version in declared.items()]
+    return out
+
 
 @provider("npm.scripts")
 def _npm_scripts(ctx: SourceContext) -> list[Suggestion]:
     """Scripts from package.json — read directly, no `npm` process."""
-    path = os.path.join(ctx.cwd, "package.json")
-    try:
-        with open(path, encoding="utf-8") as handle:
-            data = json.load(handle)
-    except (OSError, ValueError):
-        return []
-    scripts = data.get("scripts")
+    scripts = _package_json(ctx).get("scripts")
     if not isinstance(scripts, dict):
         return []
     return [Suggestion(name, str(cmd)[:60]) for name, cmd in scripts.items()]
@@ -239,3 +259,13 @@ def _flatten(data: dict, prefix: str = "") -> list[Suggestion]:
         else:
             out.append(Suggestion(full, str(value)[:40]))
     return out
+
+
+def _package_json(ctx: SourceContext) -> dict:
+    """package.json of the current directory, or an empty dict."""
+    try:
+        with open(os.path.join(ctx.cwd, "package.json"), encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}

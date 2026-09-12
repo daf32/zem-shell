@@ -135,3 +135,44 @@ def test_quoted_argument_counts_as_one_word(tmp_path, monkeypatch, completer):
     # `-m "a b"` is three words; splitting on blanks made it four and shifted
     # every argument index after it.
     assert "file.txt" in _complete(completer, 'git commit -m "a b" some')
+
+
+def test_specs_replace_the_hand_written_completers(completer):
+    from zem.hints.completer import SpecCompleter
+
+    assert isinstance(completer._completer_for("git"), SpecCompleter)
+    assert isinstance(completer._completer_for("pip3"), SpecCompleter)
+    assert completer._completer_for("yarn") is None  # no spec, no completer
+
+
+def test_python_completer_still_wins_over_a_bundled_spec(completer):
+    # `cd` ships a DirectoryCompleter; a plugin that implements
+    # get_completer() must keep working the same way.
+    from zem.ui.completers.defaults import DirectoryCompleter
+
+    assert isinstance(completer._completer_for("cd"), DirectoryCompleter)
+
+
+def test_user_spec_overrides_a_python_completer(tmp_path, monkeypatch, full_shell):
+    from zem.hints.completer import SpecCompleter
+    from zem.hints.loader import ENV_PATH
+
+    hints = tmp_path / "hints"
+    hints.mkdir()
+    (hints / "cd.json").write_text(
+        '{"schema_version": 1, "command": "cd", "fallback": "none",'
+        ' "args": [{"name": "where", "source": {"type": "values", "items": ["mine"]}}]}'
+    )
+    monkeypatch.setenv(ENV_PATH, str(hints))
+    completer = ZemCompleter(full_shell)
+    assert isinstance(completer._completer_for("cd"), SpecCompleter)
+    assert _complete(completer, "cd ") == ["mine"]
+
+
+def test_nested_subcommands_from_a_spec(completer):
+    assert "prune" in _complete(completer, "docker container ")
+
+
+def test_hints_can_be_switched_off(completer, full_shell):
+    full_shell.config.hints.enable = False
+    assert completer._completer_for("git") is None

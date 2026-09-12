@@ -4,13 +4,10 @@ from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 
 from zem.core.scan import NORMAL, scan, split_words, word_at
-from zem.ui.completers.defaults import (
-    DockerCompleter,
-    EnhancedPathCompleter,
-    GitCompleter,
-    NpmCompleter,
-    PipCompleter,
-)
+from zem.hints import sources
+from zem.hints.completer import SpecCompleter
+from zem.hints.loader import HintRegistry
+from zem.ui.completers.defaults import EnhancedPathCompleter
 from zem.ui.completers.registry import CompleterRegistry
 from zem.utils.executables import get_system_commands, refresh_system_commands
 
@@ -22,32 +19,46 @@ _MAX_ALIAS_DEPTH = 10
 class ZemCompleter(Completer):
     """Main completer for Zem shell with context-aware completion."""
 
-    #: Argument completers for common external tools.
-    DEFAULT_COMPLETERS = {
-        "git": GitCompleter,
-        "pip": PipCompleter,
-        "pip3": PipCompleter,
-        "docker": DockerCompleter,
-        "npm": NpmCompleter,
-        "npx": NpmCompleter,
-    }
-
     def __init__(self, shell):
         self.shell = shell
         self.path_completer = EnhancedPathCompleter(expanduser=True)
         self.registry = CompleterRegistry()
-        self._register_default_completers()
+        self.hints = HintRegistry(shell.config)
+        self._spec_completers: dict = {}
+        self._register_command_completers()
 
-    def _register_default_completers(self):
-        """Register built-in completers, then the ones commands provide."""
-        for name, factory in self.DEFAULT_COMPLETERS.items():
-            self.registry.register(name, factory())
-
-        # Builtins/plugins override the defaults for their own name.
+    def _register_command_completers(self):
+        """Collect the completers builtins and plugins provide in Python."""
         for name, cmd in self.shell.commands.items():
             completer = cmd.get_completer()
             if completer is not None:
                 self.registry.register(name, completer)
+
+    def _completer_for(self, name: str):
+        """Pick who completes `name`.
+
+        A spec the user wrote wins over everything -- that is how you
+        override built-in behaviour without writing Python. A Python
+        completer from a builtin or a plugin wins over a spec we ship,
+        so a plugin that deliberately implements `get_completer()` keeps
+        working.
+        """
+        spec = self.hints.get(name) if self.shell.config.hints.enable else None
+        if spec is not None and spec.origin != "bundled":
+            return self._spec_completer(spec)
+        python_completer = self.registry.get(name)
+        if python_completer is not None:
+            return python_completer
+        if spec is not None:
+            return self._spec_completer(spec)
+        return None
+
+    def _spec_completer(self, spec) -> SpecCompleter:
+        completer = self._spec_completers.get(spec.command)
+        if completer is None:
+            completer = SpecCompleter(spec, self.shell)
+            self._spec_completers[spec.command] = completer
+        return completer
 
     @property
     def system_commands(self) -> List[str]:
@@ -55,8 +66,11 @@ class ZemCompleter(Completer):
         return get_system_commands()
 
     def invalidate_cache(self):
-        """Drop the PATH scan cache (e.g. after installing new binaries)."""
+        """Drop cached PATH scans, hint specs and dynamic source results."""
         refresh_system_commands()
+        sources.clear_cache()
+        self.hints.reload()
+        self._spec_completers.clear()
 
     def _find_command_start(self, text: str) -> int:
         """Index just after the last unquoted `|`, `||`, `;` or `&&`."""
@@ -122,7 +136,7 @@ class ZemCompleter(Completer):
         word_before = words[cursor_index].text if cursor_index >= 0 else ""
         parts = self._expand_alias([w.value for w in words])
 
-        completer = self.registry.get(parts[0] if parts else "")
+        completer = self._completer_for(parts[0] if parts else "")
         if completer is not None:
             produced = False
             for completion in completer.get_completions(document, parts, word_before):
