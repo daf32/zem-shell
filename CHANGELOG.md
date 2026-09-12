@@ -15,6 +15,12 @@ All notable changes to Zem are documented here. The format follows
   `disabled_plugins` in the config records what is off. Plugins that only
   declared commands, with no `Plugin` class, keep working unchanged. See
   `docs/PLUGINS.md`.
+- `plugin install` / `plugin remove` / `plugin packages`. Installing detects
+  how Zem itself was installed (`uv tool`, `pipx`, or a virtualenv) and runs
+  the matching command, showing it and asking first — `-y` skips the question,
+  and with no terminal to ask on it refuses instead of guessing. Under `uv` it
+  re-passes the extras already installed, since `uv tool install --with`
+  replaces rather than adds.
 - One broken plugin no longer risks the shell: a failing import, a failing
   hook or an `api_version` from the future is recorded against that plugin
   and everything else loads.

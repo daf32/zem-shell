@@ -284,3 +284,149 @@ def test_config_rejects_a_bad_disabled_list(isolated_config):
 
     with pytest.raises(pydantic.ValidationError):
         AppConfig(disabled_plugins="notalist")
+
+
+# -- installing ------------------------------------------------------------
+
+@pytest.fixture
+def installer(monkeypatch):
+    """Record installer commands instead of running them."""
+    from zem.plugin import installer as module
+
+    calls = []
+
+    def _install(kind="uv-tool", extras=(), returncode=0, can_install=True, reason=""):
+        monkeypatch.setattr(
+            module, "detect_environment",
+            lambda: module.Environment(kind, f"{kind} (test)", can_install, reason),
+        )
+        monkeypatch.setattr(module, "uv_tool_extras", lambda: list(extras))
+
+        def _run(command, stdout=None, stderr=None):
+            calls.append(list(command))
+            return returncode
+
+        monkeypatch.setattr(module, "run", _run)
+        # Confirmation reads the real stdin otherwise.
+        monkeypatch.setattr("sys.stdin", type("T", (), {"isatty": lambda self: True})())
+        return calls
+
+    _install.calls = calls
+    return _install
+
+
+def test_install_keeps_the_extras_already_there(plugin_shell, run, installer):
+    """`uv tool install` replaces the extras rather than adding to them, so
+    the ones already installed must be passed again."""
+    calls = installer(kind="uv-tool", extras=["zem-plugin-a", "zem-plugin-b"])
+    code, out, _ = run(plugin_shell(), "plugin install -y zem-plugin-c")
+    assert code == 0, out
+    assert calls == [[
+        "uv", "tool", "install", "zem",
+        "--with", "zem-plugin-a", "--with", "zem-plugin-b", "--with", "zem-plugin-c",
+    ]]
+    assert "restart zem" in out
+
+
+def test_remove_drops_only_the_named_one(plugin_shell, run, installer):
+    calls = installer(kind="uv-tool", extras=["zem-plugin-a", "zem-plugin-b"])
+    code, _, _ = run(plugin_shell(), "plugin remove -y zem-plugin-a")
+    assert code == 0
+    assert calls == [[
+        "uv", "tool", "install", "zem", "--reinstall", "--with", "zem-plugin-b",
+    ]]
+
+
+def test_pipx_uses_inject(plugin_shell, run, installer):
+    calls = installer(kind="pipx")
+    run(plugin_shell(), "plugin install -y zem-plugin-c")
+    assert calls == [["pipx", "inject", "zem", "zem-plugin-c"]]
+
+
+def test_venv_uses_pip(plugin_shell, run, installer):
+    import sys
+
+    calls = installer(kind="venv")
+    run(plugin_shell(), "plugin install -y zem-plugin-c")
+    assert calls == [[sys.executable, "-m", "pip", "install", "zem-plugin-c"]]
+
+
+def test_system_python_is_refused_with_a_reason(plugin_shell, run, installer):
+    calls = installer(kind="system", can_install=False, reason="running from a system Python")
+    code, _, err = run(plugin_shell(), "plugin install -y zem-plugin-c")
+    assert code == 1 and "system Python" in err
+    assert calls == []
+
+
+def test_a_failing_installer_is_reported(plugin_shell, run, installer):
+    installer(kind="venv", returncode=2)
+    code, _, err = run(plugin_shell(), "plugin install -y zem-plugin-c")
+    assert code == 2 and "exited with 2" in err
+
+
+@pytest.mark.parametrize("bad", ["rm -rf /", "../evil", "https://example.com/x.whl", "a;b"])
+def test_only_package_names_are_accepted(plugin_shell, run, installer, bad):
+    calls = installer(kind="venv")
+    code, _, err = run(plugin_shell(), f"plugin install -y '{bad}'")
+    assert code == 2 and "does not look like a package name" in err
+    assert calls == []
+
+
+@pytest.mark.parametrize("good", ["zem-plugin-x", "zem_plugin_x", "zem-plugin-x==1.2.3",
+                                  "zem-plugin-x[extra]", "zem-plugin-x>=1.0"])
+def test_ordinary_requirements_are_accepted(good):
+    from zem.plugin.installer import validate
+
+    validate([good])
+
+
+def test_install_without_a_terminal_needs_yes(plugin_shell, run, installer, monkeypatch):
+    calls = installer(kind="venv")
+    monkeypatch.setattr("sys.stdin", type("T", (), {"isatty": lambda self: False})())
+    code, _, err = run(plugin_shell(), "plugin install zem-plugin-c")
+    assert code == 1 and "pass -y" in err
+    assert calls == []
+
+
+def test_uv_extras_are_parsed_from_uv_output(monkeypatch):
+    import subprocess as sp
+
+    from zem.plugin import installer as module
+
+    monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: sp.CompletedProcess(
+        a[0], 0, "ruff v0.1.0\nzem v0.11.1 [with: pyfiglet, cowsay]\n", ""))
+    assert module.uv_tool_extras() == ["pyfiglet", "cowsay"]
+
+
+def test_uv_extras_when_there_are_none(monkeypatch):
+    import subprocess as sp
+
+    from zem.plugin import installer as module
+
+    monkeypatch.setattr(module.subprocess, "run", lambda *a, **k: sp.CompletedProcess(
+        a[0], 0, "zem v0.11.1\n", ""))
+    assert module.uv_tool_extras() == []
+
+
+def test_environment_detection_reads_the_prefix(tmp_path, monkeypatch):
+    from zem.plugin import installer as module
+
+    monkeypatch.setattr("sys.prefix", str(tmp_path))
+    monkeypatch.setattr(module.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    (tmp_path / "uv-receipt.toml").write_text("[tool]\n")
+    assert module.detect_environment().kind == "uv-tool"
+
+    (tmp_path / "uv-receipt.toml").unlink()
+    (tmp_path / "pipx_metadata.json").write_text("{}")
+    assert module.detect_environment().kind == "pipx"
+
+
+def test_detection_without_the_installer_on_path(tmp_path, monkeypatch):
+    from zem.plugin import installer as module
+
+    monkeypatch.setattr("sys.prefix", str(tmp_path))
+    (tmp_path / "uv-receipt.toml").write_text("[tool]\n")
+    monkeypatch.setattr(module.shutil, "which", lambda name: None)
+    environment = module.detect_environment()
+    assert not environment.can_install and "not on PATH" in environment.reason
