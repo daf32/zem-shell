@@ -200,8 +200,3 @@ class ThemeCommand(BaseCommand):
         else:
             raise ArgumentError(self.name, subcommand, reason="unknown subcommand")
         return 0
-
-    def get_completer(self):
-        """Return the ThemeCompleter."""
-        from zem.ui.completers.theme import ThemeCompleter
-        return ThemeCompleter()

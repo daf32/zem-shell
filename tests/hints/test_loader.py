@@ -25,7 +25,10 @@ def test_bundled_specs_all_parse():
     registry = HintRegistry(user_dir="/nonexistent")
     specs = registry.load()
     assert registry.errors() == {}
-    assert {"git", "pip", "pip3", "docker", "npm", "npx"} <= set(specs)
+    assert {
+        "git", "pip", "pip3", "docker", "npm", "npx", "uv", "kubectl",
+        "brew", "gh", "ssh", "make", "go", "theme", "config", "weather",
+    } <= set(specs)
 
 
 def test_aliases_register_extra_names():
@@ -86,3 +89,42 @@ def test_origin_and_path_are_recorded():
     spec = HintRegistry(user_dir="/nonexistent").get("git")
     assert spec.origin == "bundled"
     assert spec.source_path.endswith("git.json")
+
+
+def test_every_provider_a_bundled_spec_names_exists():
+    """A spec referring to a provider nobody registered would be silently
+    dead: the source resolves to nothing and the user just sees no
+    suggestions."""
+    from zem.hints.providers import PROVIDERS
+    from zem.hints.spec import AnyOfSource, ProviderSource
+
+    def sources_of(node):
+        for option in node.options:
+            if option.value is not None:
+                yield option.value
+        for arg in node.args:
+            yield arg.source
+        for child in getattr(node, "subcommands", ()):
+            yield from sources_of(child)
+
+    def flatten(source):
+        if isinstance(source, AnyOfSource):
+            for nested in source.sources:
+                yield from flatten(nested)
+        else:
+            yield source
+
+    wanted = {
+        source.name
+        for spec in _unique(HintRegistry(user_dir="/nonexistent").load().values())
+        for outer in sources_of(spec)
+        for source in flatten(outer)
+        if isinstance(source, ProviderSource)
+    }
+    assert wanted <= set(PROVIDERS.names()), sorted(wanted - set(PROVIDERS.names()))
+
+
+def _unique(specs):
+    """One entry per spec; aliases register the same object twice."""
+    by_id = {id(spec): spec for spec in specs}
+    return list(by_id.values())

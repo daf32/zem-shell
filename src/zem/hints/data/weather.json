@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "command": "weather",
+  "description": "Show a weather forecast",
+  "fallback": "none",
+  "args": [{"name": "city", "description": "City to report on",
+            "source": {"type": "values", "items": [
+              "Amsterdam", "Barcelona", "Berlin", "Chicago", "Dubai", "Istanbul",
+              "London", "Los Angeles", "Madrid", "Moscow", "New York", "Paris",
+              "Rome", "Saint Petersburg", "Singapore", "Sydney", "Tokyo", "Toronto"
+            ]}}]
+}

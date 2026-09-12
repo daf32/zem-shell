@@ -8,9 +8,11 @@ sit on.
 
 from __future__ import annotations
 
+import glob
 import json
 import logging
 import os
+import re
 from typing import Callable, Iterable, Literal, Optional, Union
 
 from zem.hints.sources import SourceContext, Suggestion, run_command
@@ -193,6 +195,111 @@ def _npm_scripts(ctx: SourceContext) -> list[Suggestion]:
     if not isinstance(scripts, dict):
         return []
     return [Suggestion(name, str(cmd)[:60]) for name, cmd in scripts.items()]
+
+
+@provider("uv.tools")
+def _uv_tools(ctx: SourceContext) -> list[Suggestion]:
+    out = _run(ctx, ["uv", "tool", "list"], scope="global", ttl_ms=30_000, timeout_ms=1500)
+    # `uv tool list` indents the entry points under each tool; the tools
+    # themselves are the unindented `name version` lines.
+    return [Suggestion(item.value.split()[0]) for item in out if not item.value.startswith("-")]
+
+
+@provider("brew.installed")
+def _brew_installed(ctx: SourceContext) -> list[Suggestion]:
+    return _run(ctx, ["brew", "list", "--formula"], scope="global", ttl_ms=60_000,
+                timeout_ms=2000, max_items=500)
+
+
+@provider("k8s.resources")
+def _k8s_resources(ctx: SourceContext) -> list[Suggestion]:
+    """Resource kinds the cluster knows, so `kubectl get <TAB>` is useful."""
+    return _run(ctx, ["kubectl", "api-resources", "--no-headers", "-o", "name"],
+                scope="global", ttl_ms=300_000, timeout_ms=2000, max_items=500)
+
+
+@provider("k8s.pods")
+def _k8s_pods(ctx: SourceContext) -> list[Suggestion]:
+    out = _run(ctx, ["kubectl", "get", "pods", "--no-headers",
+                     "-o", "custom-columns=:metadata.name,:status.phase"],
+               scope="global", ttl_ms=5000, timeout_ms=2000)
+    pods = []
+    for item in out:
+        name, _, phase = item.value.partition(" ")
+        pods.append(Suggestion(name, phase.strip()))
+    return pods
+
+
+@provider("make.targets")
+def _make_targets(ctx: SourceContext) -> list[Suggestion]:
+    """Targets of the local Makefile.
+
+    Parsed rather than asked of `make`: `make -qp` runs the makefile's
+    shell assignments, which is not something a TAB press should do.
+    """
+    targets: list[Suggestion] = []
+    seen: set[str] = set()
+    for name in ("Makefile", "makefile", "GNUmakefile"):
+        path = os.path.join(ctx.cwd, name)
+        if not os.path.isfile(path):
+            continue
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    match = _MAKE_TARGET.match(line)
+                    if match is None:
+                        continue
+                    for target in match.group(1).split():
+                        if target not in seen and not target.startswith("."):
+                            seen.add(target)
+                            targets.append(Suggestion(target))
+        except OSError:
+            continue
+        break
+    return targets
+
+
+_MAKE_TARGET = re.compile(r"^([A-Za-z0-9._%/$(){} -]+):(?!=)")
+
+
+@provider("ssh.hosts")
+def _ssh_hosts(ctx: SourceContext) -> list[Suggestion]:
+    """Hosts named in ~/.ssh/config, plus its Include files."""
+    hosts: list[Suggestion] = []
+    seen: set[str] = set()
+    for path in _ssh_config_files():
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    parts = line.strip().split()
+                    if len(parts) < 2 or parts[0].lower() != "host":
+                        continue
+                    for name in parts[1:]:
+                        # Patterns are not connectable destinations.
+                        if any(ch in name for ch in "*?!") or name in seen:
+                            continue
+                        seen.add(name)
+                        hosts.append(Suggestion(name, os.path.basename(path)))
+        except OSError:
+            continue
+    return hosts
+
+
+def _ssh_config_files() -> list[str]:
+    base = os.path.expanduser("~/.ssh/config")
+    files = [base]
+    try:
+        with open(base, encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                parts = line.strip().split()
+                if len(parts) >= 2 and parts[0].lower() == "include":
+                    for pattern in parts[1:]:
+                        files += sorted(glob.glob(os.path.expanduser(
+                            pattern if os.path.isabs(pattern)
+                            else os.path.join("~/.ssh", pattern))))
+    except OSError:
+        pass
+    return files
 
 
 # --- zem itself -----------------------------------------------------------

@@ -1,69 +1,9 @@
 import os
-from typing import Any, List
-
-from prompt_toolkit.completion import Completion
-from prompt_toolkit.document import Document
+from typing import Any
 
 from zem.builtins.base import BaseCommand
 from zem.core.context import ExecutionContext
 from zem.errors.input_error import ArgumentError
-from zem.ui.completers.base import BaseArgCompleter
-
-
-class ConfigCompleter(BaseArgCompleter):
-    """Completer for config command with subcommand and key completion."""
-    
-    SUBCOMMANDS = {
-        "list": "List all configuration values",
-        "get": "Get a configuration value",
-        "set": "Set a configuration value",
-        "reload": "Reload configuration from file",
-        "path": "Show configuration file path",
-        "edit": "Open configuration in editor",
-    }
-    
-    def __init__(self, config_data: dict):
-        self.config_data = config_data
-
-    def _get_keys(self, data: dict, prefix: str = "") -> List[str]:
-        keys = []
-        for k, v in data.items():
-            full_key = f"{prefix}.{k}" if prefix else k
-            if isinstance(v, dict):
-                keys.extend(self._get_keys(v, full_key))
-            else:
-                keys.append(full_key)
-        return keys
-
-    def get_completions(self, document: Document, parts: List[str], word_before: str):
-        ends_with_space = document.text_before_cursor.endswith(" ")
-        
-        # Subcommands completion
-        if len(parts) == 1 and ends_with_space:
-            for cmd, desc in sorted(self.SUBCOMMANDS.items()):
-                yield Completion(cmd, start_position=0, display_meta=desc)
-            return
-        
-        if len(parts) == 2 and not ends_with_space:
-            current_subcmd = parts[1]
-            for cmd, desc in sorted(self.SUBCOMMANDS.items()):
-                if cmd.startswith(current_subcmd):
-                    yield Completion(cmd, start_position=-len(current_subcmd), display_meta=desc)
-            return
-
-        # Key completion for get/set
-        if len(parts) >= 2:
-            subcmd = parts[1]
-            if subcmd in ["get", "set"]:
-                if (len(parts) == 2 and ends_with_space) or (
-                    len(parts) == 3 and not ends_with_space
-                ):
-                    all_keys = self._get_keys(self.config_data)
-                    current_input = parts[2] if len(parts) == 3 else ""
-                    
-                    for key in sorted(all_keys):
-                        if key.lower().startswith(current_input.lower()):
-                            yield Completion(key, start_position=-len(current_input))
 
 
 class ConfigCommand(BaseCommand):
@@ -80,14 +20,6 @@ class ConfigCommand(BaseCommand):
         "config path                    - Show config file location",
         "config edit                    - Open config in $EDITOR",
     ]
-
-    def get_completer(self):
-        from zem.config.settings import get_config_path
-        from zem.config.store import read_raw
-        try:
-            return ConfigCompleter(read_raw(get_config_path()))
-        except Exception:
-            return ConfigCompleter({})
 
     def execute(
         self,
