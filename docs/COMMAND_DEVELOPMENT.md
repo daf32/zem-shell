@@ -235,8 +235,12 @@ with a clear error instead of misbehaving.
 
 ## Completion and Plugin Config
 
-* Override `get_completer()` to return a `BaseArgCompleter` for argument
-  completion (see `src/zem/ui/completers/base.py`).
+* Argument completion normally comes from a **hint spec**: a JSON file in
+  `src/zem/hints/data/` (or `~/.zem/hints/`) describing subcommands, flags
+  and where their values come from. See `docs/HINT_SPECS.md`.
+* Override `get_completer()` to return a `BaseArgCompleter` when a spec
+  cannot express what you need (see `src/zem/ui/completers/base.py`). A
+  Python completer wins over a bundled spec, so this keeps working.
 * Override `get_default_config()` to ship defaults; the shell writes them
   into `config.json` under `plugins.<name>` on first start. Read them back
   with `self.get_plugin_config(context)`.

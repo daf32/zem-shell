@@ -61,9 +61,22 @@ All writes to `config.json` go through `config/store.py` (`update_raw`: flock + 
 ### UI (`src/zem/ui/`)
 
 - `lexer.py` — `ZemLexer` does live syntax classification (commands, variables, paths, flags, strings, errors). Invalid command names are rendered with the `error` color from the theme.
-- `completer.py` + `completers/` — `ZemCompleter` owns a per-instance `CompleterRegistry`. Order: command-name position (whole first word as prefix) → registered completer for the command (or the alias's resolved target) → if it yields nothing and `fallback_to_paths` is true, `EnhancedPathCompleter`, which completes the *current word* (prompt_toolkit's `PathCompleter` would take the whole line). Defaults: `git`, `pip`, `pip3`, `docker`, `npm`, `npx`; builtins add their own via `get_completer()` (`cd`, `theme`, `config`). Command segments are split quote-aware with `core.scan`. System commands come from `utils.executables.get_system_commands()`, cached per `PATH` value.
+- `completer.py` + `completers/` — `ZemCompleter` splits the line with `core.scan.word_at` (quote-aware, with offsets), expands a leading alias in full, then picks who completes the command in `_completer_for`: a **user** hint spec → a Python `BaseArgCompleter` from `get_completer()` (`cd` only, now) → a **bundled** hint spec → `EnhancedPathCompleter`, which completes the *current word* (prompt_toolkit's `PathCompleter` would take the whole line). The word under the cursor comes from `Word.text`, not `get_word_before_cursor()`, which cuts at dashes. System commands come from `utils.executables.get_system_commands()`, cached per `PATH` value. `PromptSession` runs completion with `complete_in_thread=True` because specs may shell out.
 - `search.py` — `FuzzyHistorySearch` (Ctrl+R) merges file-history with in-memory `context.history`; its style is built from the theme colours.
 - `history.py` — `ZemFileHistory` adds `clear()` (used by `history -c`). Ghost-text suggestions come from `AutoSuggestFromHistory` (`input.auto_suggest`).
+
+### Completion hints (`src/zem/hints/`)
+
+Argument completion is declarative: JSON specs in `src/zem/hints/data/` (bundled) and `~/.zem/hints/` (user, replaces bundled by command name; `ZEM_HINTS_PATH` adds directories in between).
+
+- `spec.py` — pydantic models, `extra="forbid"`, `schema_version` gates forward compatibility. `CommandSource.run` rejects `{placeholder}` interpolation (injection vector) but allows Go templates `{{.Name}}`.
+- `loader.py` — `HintRegistry`: lazy load, a broken file is recorded in `errors()` and skipped, never raised.
+- `resolver.py` — `resolve(spec, words, cursor_index, prefix)`, a pure function: descends subcommands, skips flag values, handles `--flag=value`, `-p8080`, `--`, variadic positionals, and drops `> file` redirections so they don't shift argument indices.
+- `sources.py` — resolves a `ValueSource`. The subprocess runner is the delicate part: argv only, `start_new_session=True` (job control uses `tcsetpgrp`; a helper in the foreground group could hang the prompt), `stdin=DEVNULL`, `LC_ALL=C`/`GIT_OPTIONAL_LOCKS=0`, timeout, TTL cache keyed on cwd, optional `guard`, negative caching for missing binaries. Every failure becomes an empty list.
+- `providers.py` — `PROVIDERS` registry plus the `@provider` decorator; specs name providers as strings, resolved lazily, which is the seam the plugin API will use.
+- `completer.py` — `SpecCompleter(BaseArgCompleter)`: yields static suggestions before dynamic ones (a cancelled round should lose the expensive half), `fallback_to_paths = False` because `spec.fallback` states it explicitly.
+
+Config section `hints` (`enable`, `dynamic`, `command_timeout_ms`, `cache_ttl_ms`, `user_dir`). Tests: `tests/hints/`; the suite-wide `_no_hint_subprocess` fixture in `tests/conftest.py` stubs `sources.run_command` so no test depends on a real git/docker, and `tests/hints/conftest.py` overrides it. See `docs/HINT_SPECS.md`.
 
 ### Themes (`src/zem/themes/`)
 
@@ -80,7 +93,7 @@ JSON files describing the `ColorScheme`. `ThemeManager` (in `utils/themes.py`) l
 
 ## Adding a builtin
 
-Drop a file in `src/zem/builtins/` with a `BaseCommand` subclass — the filename becomes the command name, registration is automatic. If the command needs argument completion, override `get_completer()` to return a `BaseArgCompleter`. If it's plugin-like and ships defaults, override `get_default_config()` and read them via `self.get_plugin_config(context)`.
+Drop a file in `src/zem/builtins/` with a `BaseCommand` subclass — the filename becomes the command name, registration is automatic. For argument completion write a hint spec (`src/zem/hints/data/<name>.json`); `get_completer()` returning a `BaseArgCompleter` is the escape hatch for what a spec cannot express. If it's plugin-like and ships defaults, override `get_default_config()` and read them via `self.get_plugin_config(context)`.
 
 External plugins live in `~/.zem/plugins/` and follow the same pattern. They are loaded last and may override builtins by reusing the same command name.
 
