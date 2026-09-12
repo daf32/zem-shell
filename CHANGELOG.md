@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.11.2] - 2026-09-12
 ### Added
 - **Plugin API.** A plugin is a `Plugin` subclass — a single file in
   `~/.zem/plugins/` or a package declaring a `zem.plugins` entry point
