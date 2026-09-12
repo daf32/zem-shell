@@ -22,6 +22,13 @@ All notable changes to Zem are documented here. The format follows
   `hints.dynamic = false` to stop specs shelling out entirely.
 - Completion now runs on a worker thread, so a spec that shells out cannot
   stall the prompt.
+- **`hints` command and a spec registry.** The wheel ships specs only for
+  tools almost everyone has; the rest are fetched on demand with
+  `hints search` / `hints install` / `hints update` / `hints remove`, which
+  verify each download's checksum and validate it before writing to
+  `~/.zem/hints/`. `hints list`, `hints show <command>`, `hints validate` and
+  `hints providers` cover inspection and writing your own. Point
+  `hints.registry_url` at your own registry if you like.
 
 ### Fixed
 - Flags with a typed prefix complete again. `pip install --upg<TAB>` produced
