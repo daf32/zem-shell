@@ -5,6 +5,28 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- **Parser conformance with POSIX** in the idioms people carry over from
+  bash. A backslash inside double quotes now escapes only `$`, `"`, `\`,
+  `` ` `` and a newline, so `printf "%s\n"` prints newlines instead of the
+  letter `n` and `"C:\temp"` keeps its backslash. `# comment` at the end of
+  a line is a comment (also in `~/.zemrc` after a command), and a `|` or `;`
+  inside one no longer starts a command. A single `&` ends the command it
+  follows, so `sleep 5 & echo hi` runs both instead of handing `echo hi` to
+  `sleep`. An alias body is re-parsed as text, the way bash does it:
+  `alias gl='git log --oneline | head'` and `alias up='git pull && uv sync'`
+  work, an alias in a later pipeline stage (`... | up`) expands, and a
+  quoted first word (`'ls'`, `\ls`) bypasses the alias.
+- An unset (or empty) variable used unquoted expands to nothing: `ls $UNSET`
+  runs `ls`, not `ls ''`. In double quotes it still gives an empty argument.
+
+### Added
+- Special parameters `$$` (the shell's pid), `$!` (pid of the last
+  background job), `$0` (`zem`), `$#`, `$@` and `$*` (empty: scripts take no
+  arguments yet).
+- `tests/test_parser_conformance.py`: a corpus of lines whose argv was
+  checked against bash, plus the one deliberate difference (`$VAR` is not
+  word-split).
 
 ## [0.12.5] - 2026-09-13
 ### Changed

@@ -131,10 +131,10 @@ def test_variable_value_is_not_word_split():
     assert _args("echo $X", {"X": "a b"}) == ["echo", "a b"]
 
 
-def test_comment_char_is_ordinary_text():
-    # `#` has no comment meaning inside a command line (only the rc loader
-    # skips whole-line comments).
+def test_comment_char_inside_a_word_is_ordinary_text():
+    # `#` starts a comment only at the beginning of a word.
     assert _args("echo a#b") == ["echo", "a#b"]
+    assert _args("echo a #b") == ["echo", "a"]
 
 
 # -- logic and pipes ---------------------------------------------------
@@ -187,8 +187,10 @@ def test_background_marks_last_stage_only():
 
 def test_background_in_middle_unit():
     units = _parse("a & b")
-    # `&` is not a separator today: it only flags the pipeline.
+    # `&` ends the unit like `;` and sends it to the background.
     assert units[0]["pipeline"][0]["background"] is True
+    assert units[0]["pipeline"][0]["args"] == []
+    assert units[1]["pipeline"][0]["name"] == "b"
 
 
 # -- aliases -----------------------------------------------------------

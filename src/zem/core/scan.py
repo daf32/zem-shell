@@ -8,11 +8,42 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from zem.config.settings import OperatorsConfig
 
-NORMAL, SINGLE, DOUBLE, SUBST = range(4)
+NORMAL, SINGLE, DOUBLE, SUBST, COMMENT = range(5)
 
 #: Characters that start a redirection operator. A word made of these (plus a
 #: leading fd digit) is shell syntax, not an argument of the command.
 _REDIRECT_CHARS = "<>&"
+
+#: Inside double quotes a backslash only escapes these (POSIX 2.2.3); before
+#: anything else it is an ordinary character, so `"%s\n"` keeps its `\n`.
+DOUBLE_QUOTE_ESCAPABLE = '$"\\`\n'
+
+#: A `#` starts a comment only at the beginning of a word: after a blank, at
+#: the start of the line, or right after an operator (`echo a;# b`).
+_COMMENT_AFTER = ";|&()"
+
+
+def escapes_next(text: str, index: int, state: int) -> bool:
+    """Whether the backslash at ``text[index]`` escapes the character after it.
+
+    Outside quotes every character can be escaped. Inside double quotes only
+    :data:`DOUBLE_QUOTE_ESCAPABLE` can; a backslash at the very end of the
+    text counts as escaping the newline that continues the line. Inside
+    single quotes and comments a backslash is never an escape.
+    """
+    if state == NORMAL:
+        return True
+    if state == DOUBLE:
+        return index + 1 >= len(text) or text[index + 1] in DOUBLE_QUOTE_ESCAPABLE
+    return False
+
+
+def starts_comment(text: str, index: int) -> bool:
+    """Whether an unquoted ``#`` at ``text[index]`` begins a comment."""
+    if index == 0:
+        return True
+    prev = text[index - 1]
+    return prev.isspace() or prev in _COMMENT_AFTER
 
 
 def scan(text: str, ops: "OperatorsConfig") -> tuple[list[tuple[str, bool, int]], int, bool]:
@@ -20,26 +51,36 @@ def scan(text: str, ops: "OperatorsConfig") -> tuple[list[tuple[str, bool, int]]
 
     Returns ``(chars, final_state, dangling_escape)`` where ``chars`` is a
     list of ``(char, escaped, state)``. ``state`` is ``SUBST`` while inside
-    ``$( ... )`` at any depth, otherwise ``NORMAL``/``SINGLE``/``DOUBLE``.
-    ``dangling_escape`` is true when the text ends with an unconsumed
-    escape character (i.e. a line continuation).
+    ``$( ... )`` at any depth, ``COMMENT`` from an unquoted ``#`` that starts
+    a word up to the end of that line, otherwise ``NORMAL``/``SINGLE``/
+    ``DOUBLE``. ``dangling_escape`` is true when the text ends with an
+    unconsumed escape character (i.e. a line continuation).
     """
     chars: list[tuple[str, bool, int]] = []
     state = NORMAL
     escaped = False
     depth = 0
     for i, ch in enumerate(text):
+        if state == COMMENT:
+            chars.append((ch, False, COMMENT))
+            if ch == "\n":
+                state = NORMAL
+            continue
+
         chars.append((ch, escaped, SUBST if depth else state))
 
         if escaped:
             escaped = False
-        elif ch == ops.escape and state != SINGLE:
+        elif ch == ops.escape and escapes_next(text, i, state):
             escaped = True
         elif state == NORMAL:
             if ch == ops.quote:
                 state = SINGLE
             elif ch == ops.double_quote:
                 state = DOUBLE
+            elif ch == ops.comment and not depth and starts_comment(text, i):
+                chars[-1] = (ch, False, COMMENT)
+                state = COMMENT
             elif ch == ops.variable and text[i + 1:i + 2] == "(":
                 depth += 1
             elif ch == ")" and depth:
@@ -56,6 +97,8 @@ def scan(text: str, ops: "OperatorsConfig") -> tuple[list[tuple[str, bool, int]]
 
     if depth:
         state = SUBST
+    elif state == COMMENT:
+        state = NORMAL  # a comment ends with the line; nothing is left open
     return chars, state, escaped
 
 
@@ -120,9 +163,10 @@ def split_words(text: str, ops: "OperatorsConfig") -> list[Word]:
     Unlike :meth:`zem.core.parser.Parser._tokenize` this performs no
     expansion whatsoever: no variables, no globs and — crucially — no
     ``$(...)`` substitution. Completion runs on every keystroke, so running
-    a command just to split a line would be a disaster.
+    a command just to split a line would be a disaster. Comments are
+    dropped.
     """
-    chars, _, _ = scan(text, ops)
+    chars, _, dangling = scan(text, ops)
     words: list[Word] = []
     buf: list[str] = []
     start = -1
@@ -136,6 +180,9 @@ def split_words(text: str, ops: "OperatorsConfig") -> list[Word]:
             start = -1
 
     for i, (ch, escaped, state) in enumerate(chars):
+        if state == COMMENT:
+            flush(i)
+            continue
         if not escaped and state == NORMAL and ch.isspace():
             flush(i)
             continue
@@ -143,9 +190,12 @@ def split_words(text: str, ops: "OperatorsConfig") -> list[Word]:
         # Quote and escape characters delimit the word but are not part of
         # its value. `scan` records the state *before* the transition, so an
         # opening quote carries NORMAL and the closing one carries its own
-        # state -- hence two states per quote character.
+        # state -- hence two states per quote character. A backslash is
+        # syntax only when it actually escapes what follows (the next
+        # character's flag says so); `"a\n"` keeps its backslash.
+        next_escaped = chars[i + 1][1] if i + 1 < len(chars) else dangling
         is_syntax = not escaped and (
-            (ch == ops.escape and state in (NORMAL, DOUBLE))
+            (ch == ops.escape and state in (NORMAL, DOUBLE) and next_escaped)
             or (ch == ops.quote and state in (NORMAL, SINGLE))
             or (ch == ops.double_quote and state in (NORMAL, DOUBLE))
         )

@@ -15,7 +15,8 @@ Zem is a modular Python-based shell focused on extensibility and speed.
 
 - **Interactive-shell syntax** (fish-like scope: no `if`/`for`/functions — run scripts with bash):
   - Pipelines `|`, logic `&&` `||` `;`, background `&`.
-  - Quoting, backslash escapes, `$VAR`, `${VAR}`, `$?`, `$(...)` command substitution.
+  - Quoting, backslash escapes, `# comments`, `$VAR`, `${VAR}`, `$?`, `$$`, `$!`,
+    `$(...)` command substitution.
   - Redirections `<` `>` `>>` `2>` `2>>` `&>` `&>>` and descriptor
     duplication `>&1` `>&2` `1>&2` `2>&1`; `~` and `~user` expansion; globs.
   - Line continuation (trailing `\`, open quote, trailing operator) and
@@ -58,6 +59,20 @@ Zem is a modular Python-based shell focused on extensibility and speed.
   with a `zem.plugins` entry point — can add commands, completion, themes and
   hooks that see every line before and after it runs. `plugin list` shows what
   is loaded. See [docs/PLUGINS.md](docs/PLUGINS.md).
+
+### Where Zem differs from POSIX
+
+Zem follows bash where a line would otherwise mean something different, and
+checks that with a corpus of lines compared against `bash -c`
+(`tests/test_parser_conformance.py`). The differences are deliberate:
+
+- **`$VAR` is one word**, whatever it contains (fish semantics): `set F 'my
+  file'; cat $F` reads one file. An unset or empty variable used unquoted
+  vanishes, as in bash; `"$VAR"` is always exactly one argument.
+- **Redirections are not ordered**: `cmd 2>&1 >file` sends both streams to
+  the file (bash would keep stderr on the terminal).
+- **No `if`/`for`/functions, no `$1` in scripts**: it is an interactive
+  shell; run scripts with bash.
 
 ## Non-interactive use
 
