@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.5] - 2026-09-13
 ### Changed
 - **`pushd`, `popd`, `dirs` ship as the `dirstack` plugin**, and **`history`
   as `history`**. Both are on by default. Recording history, `!!` expansion
