@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.6] - 2026-09-13
 ### Changed
 - **`help` ships as a plugin**, finishing the split. Zem is now built out of
   its own plugin API: nine bundled plugins (`coreutils`, `scripting`,
