@@ -63,6 +63,21 @@ class Plugin:
         """Directories of theme JSON files."""
         return ()
 
+    def prompt_modules(self) -> Mapping[str, Any]:
+        """Prompt modules, as `{"name": PromptModule()}`.
+
+        Put `$name` in `prompt.format` (or `prompt.right_format`) to make it
+        appear. Reusing a builtin name replaces that module.
+        """
+        return {}
+
+    def key_bindings(self) -> Any:
+        """A prompt_toolkit `KeyBindings`, merged with the shell's own.
+
+        Return `None` for no bindings.
+        """
+        return None
+
     # -- lifecycle ---------------------------------------------------------
 
     def on_startup(self, shell) -> None:

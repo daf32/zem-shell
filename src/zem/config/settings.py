@@ -70,6 +70,22 @@ class ColorScheme(BaseModel):
 class VenvScheme(BaseModel):
     auto: bool = True
 
+class PromptSettings(BaseModel):
+    """What the prompt is made of.
+
+    `format` is a small language: `$module` substitutes a module,
+    `[text](style)` styles what it contains, and `(...)` renders only when
+    something inside it produced output. Each module can be configured
+    under `modules`, with its own `format`, `style` and `disabled`.
+    """
+
+    format: str = "$venv$exit_code$path$git$symbol"
+    right_format: str = "$duration$time"
+    time_format: str = "%H:%M:%S"
+    #: Per-module overrides: {"git": {"format": " on [$branch]($style)"}}
+    modules: Dict[str, Any] = Field(default_factory=dict)
+
+
 class HintsSettings(BaseModel):
     """Declarative completion hints (`zem.hints`)."""
 
@@ -124,6 +140,7 @@ class AppConfig(BaseSettings):
     colors: ColorScheme = Field(default_factory=ColorScheme)
     active_theme: str = "default"
     venv: VenvScheme = Field(default_factory=VenvScheme)
+    prompt: PromptSettings = Field(default_factory=PromptSettings)
     hints: HintsSettings = Field(default_factory=HintsSettings)
     #: Plugins the user turned off with `plugin disable`.
     disabled_plugins: List[str] = Field(default_factory=list)

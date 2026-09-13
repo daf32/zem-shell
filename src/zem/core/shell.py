@@ -5,7 +5,6 @@ import sys
 import termios
 import threading
 import time
-from datetime import datetime
 from typing import Dict, Optional
 
 from prompt_toolkit import PromptSession
@@ -29,8 +28,8 @@ from zem.plugin.manager import PluginManager
 from zem.ui.completer import ZemCompleter
 from zem.ui.history import ZemFileHistory
 from zem.ui.lexer import ZemLexer
-from zem.utils.git import format_git_branch, get_git_info
-from zem.utils.venv import activate_venv, get_venv_info
+from zem.ui.prompt import PromptContext, PromptRenderer
+from zem.utils.venv import activate_venv
 
 
 class Shell:
@@ -100,6 +99,7 @@ class Shell:
             activate_venv(self.context)
 
         self._sync_plugin_configs()
+        self.prompt_renderer = PromptRenderer(self, self.plugins.prompt_modules())
         self.plugins.notify("on_startup", self)
 
         if headless:
@@ -278,6 +278,14 @@ class Shell:
                 event.current_buffer.text = result
                 event.current_buffer.cursor_position = len(result)
 
+        plugin_bindings = self.plugins.key_bindings()
+        if plugin_bindings:
+            from prompt_toolkit.key_binding import merge_key_bindings
+
+            # The shell's own bindings come first, so a plugin cannot take
+            # Ctrl-C away by accident.
+            kb = merge_key_bindings([kb, *plugin_bindings])
+
         auto_suggest = AutoSuggestFromHistory() if self.config.input.auto_suggest else None
         self.session = PromptSession(
             history=history,
@@ -348,125 +356,26 @@ class Shell:
         if not self.headless:
             print("Closing shell...")
 
-    def _format_path(self, current_dir: str) -> str:
-        """Format current directory for display."""
-        home = os.path.expanduser("~")
-        if current_dir.startswith(home):
-            display_path = current_dir.replace(home, "~")
-        else:
-            display_path = current_dir
-
-        if self.config.input.show_full_path:
-            return display_path
-
-        parts = display_path.strip("/").split("/")
-        depth = self.config.input.path_depth
-        if len(parts) > depth:
-            return "/".join(parts[-depth:])
-        return display_path
-
-    def _format_path_display(self, path: str) -> str:
-        """Add ~ prefix if path doesn't start with it."""
-        return path if path.startswith("~") else f"~ {path}"
-
-    def _build_colored_prompt(
-        self, venv_info: str | None, path: str, git_info: str, exit_code: int
-    ) -> list:
-        """Build colored prompt components."""
-        code_class = 'exit_code_ok' if exit_code == 0 else 'exit_code_err'
-        path_display = self._format_path_display(path)
-        
-        prompt_parts = []
-
-        if venv_info:
-            prompt_parts.append(('class:venv', f'[{venv_info}] '))
-
-        if self.config.input.show_exit_code:
-            prompt_parts.append((f'class:{code_class}', f'{exit_code} '))
-        
-        prompt_parts.append(('class:path', path_display))
-        
-        if git_info:
-            prompt_parts.append(('class:git_branch', git_info))
-        
-        prompt_parts.extend([
-            ('', ' '),
-            ('class:prompt_symbol', self.config.input.prompt),
-            ('', ' ')
-        ])
-        return prompt_parts
-
-    def _build_text_prompt(
-        self, venv_info: str | None, path: str, git_info: str, exit_code: int
-    ) -> str:
-        """Build text-only prompt."""
-        prompt_text = f"{exit_code} " if self.config.input.show_exit_code else ""
-        path_display = self._format_path_display(path)
-        prompt_text += f"{venv_info}{path_display}{git_info} {self.config.input.prompt} "
-        return prompt_text
-
-    def _format_duration(self, seconds: float) -> str:
-        """Format duration for display."""
-        if seconds < 0.001:
-            return ""  # Don't show for very fast commands
-        elif seconds < 1:
-            return f"{int(seconds * 1000)}ms"
-        elif seconds < 60:
-            return f"{seconds:.1f}s"
-        elif seconds < 3600:
-            mins = int(seconds // 60)
-            secs = int(seconds % 60)
-            return f"{mins}m{secs}s"
-        else:
-            hours = int(seconds // 3600)
-            mins = int((seconds % 3600) // 60)
-            return f"{hours}h{mins}m"
-
-    def _get_rprompt(self) -> list:
-        """Build right prompt with time and command duration."""
-        parts = []
-        
-        # Show command duration if significant
-        if self._last_command_duration is not None and self._last_command_duration >= 0.1:
-            duration_str = self._format_duration(self._last_command_duration)
-            if duration_str:
-                parts.append(('class:duration', f"⏱ {duration_str} "))
-        
-        # Show current time
-        current_time = datetime.now().strftime("%H:%M:%S")
-        parts.append(('class:rprompt', current_time))
-        
-        return parts
+    def _prompt_context(self) -> PromptContext:
+        return PromptContext(
+            shell=self,
+            cwd=os.getcwd(),
+            exit_code=self.context.last_exit_code,
+            duration=self._last_command_duration,
+        )
 
     def _get_input(self):
         lexer = getattr(self.session, "lexer", None)
         if hasattr(lexer, "clear_path_cache"):
             lexer.clear_path_cache()
-        real_cwd = os.getcwd()
-        display_path = self._format_path(real_cwd)
-        exit_code = self.context.last_exit_code
-        
-        git_display = ""
-        if getattr(self.config.input, "show_git_info", False):
-            git_info = get_git_info(real_cwd)
-            if git_info:
-                branch, status = git_info
-                git_display = f" ({format_git_branch(branch, status)})"
 
-        show_venv = getattr(self.config.input, "show_venv_info", False)
-        venv_display = get_venv_info() if show_venv else None
-
-        if self.config.input.color_prompt:
-            prompt_html = self._build_colored_prompt(
-                venv_display, display_path, git_display, exit_code
-            )
-        else:
-            prompt_html = self._build_text_prompt(
-                venv_display, display_path, git_display, exit_code
-            )
-
-        # Build right prompt
-        rprompt = self._get_rprompt() if self.config.input.rprompt else None
+        ctx = self._prompt_context()
+        prompt_html = self.prompt_renderer.render(
+            self.config.prompt.format, ctx, colored=self.config.input.color_prompt
+        )
+        rprompt = None
+        if self.config.input.rprompt:
+            rprompt = self.prompt_renderer.render(self.config.prompt.right_format, ctx)
 
         text = self.session.prompt(prompt_html, rprompt=rprompt)
         while Parser.needs_continuation(text, self.config):
