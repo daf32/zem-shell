@@ -63,11 +63,11 @@ class Plugin:
         """Directories of theme JSON files."""
         return ()
 
-    def prompt_segments(self) -> Mapping[str, Any]:
-        """Prompt segments, as `{"name": PromptSegment()}`.
+    def prompt_modules(self) -> Mapping[str, Any]:
+        """Prompt modules, as `{"name": PromptModule()}`.
 
-        Add the name to `input.segments` (or `input.rprompt_segments`) to
-        make it appear. Reusing a builtin name replaces that segment.
+        Put `$name` in `prompt.format` (or `prompt.right_format`) to make it
+        appear. Reusing a builtin name replaces that module.
         """
         return {}
 

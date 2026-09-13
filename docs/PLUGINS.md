@@ -70,7 +70,7 @@ Every hook is optional.
 | `hint_providers()` | `{"mytool.things": fn}` — values for specs to use |
 | `completers()` | `{"command": BaseArgCompleter}` for what a spec cannot express |
 | `themes()` | directories of theme JSON files |
-| `prompt_segments()` | `{"name": PromptSegment()}` — pieces of the prompt |
+| `prompt_modules()` | `{"name": PromptModule()}` — pieces of the prompt |
 | `key_bindings()` | a prompt_toolkit `KeyBindings`, merged with the shell's |
 
 And four lifecycle hooks:
@@ -87,41 +87,52 @@ which is how a "did you mean" or an auto-`sudo` plugin would work. The first
 plugin to return a rewrite wins. Keep it fast — it is on the path of every
 command.
 
-## Prompt segments
+## Prompt modules
 
-The prompt is a list of named segments, and `input.segments` is their order:
+The prompt is a format string, and modules are what you put in it:
 
 ```bash
-config set input.segments '["venv", "exit_code", "path", "git", "symbol"]'
-config set input.rprompt_segments '["duration", "time"]'
+config set prompt.format '$venv$exit_code$path$git$symbol'
 ```
 
-A plugin adds its own:
+A plugin adds a module. A module reports *variables*; its format string
+decides what to do with them, which is what makes it configurable without
+touching Python:
 
 ```python
-from zem.ui.prompt import PromptSegment
+from zem.ui.prompt import PromptModule
 
 
-class KubeSegment(PromptSegment):
+class KubeModule(PromptModule):
     name = "kube"
+    default_format = "[ ⎈ $context]($style)"
+    default_style = "info"
 
-    def render(self, ctx):
+    def variables(self, ctx):
         # ctx has .shell, .cwd, .exit_code and .duration
         context = current_kube_context()
-        return [("class:git_branch", f" ({context})")] if context else None
+        return {"context": context} if context else None
 
 
 class KubePlugin(Plugin):
-    def prompt_segments(self):
-        return {"kube": KubeSegment()}
+    def prompt_modules(self):
+        return {"kube": KubeModule()}
 ```
 
-Then `config set input.segments '["exit_code", "path", "kube", "symbol"]'`.
+Then `config set prompt.format '$exit_code$path$kube$symbol'`, and the user
+can restyle it without touching your code:
+
+```bash
+config set prompt.modules '{"kube": {"format": " on [$context](bold blue)"}}'
+```
 
 Return `None` when there is nothing to show — that is how `git` disappears
-outside a repository. A segment that raises is skipped and logged, and the
-rest of the prompt still renders: losing your prompt to a plugin's bad day
-would be a poor trade. Reusing a builtin name replaces that segment.
+outside a repository, and how any `(...)` group mentioning it disappears with
+it. A module that raises is skipped and logged, and the rest of the prompt
+still renders: losing your prompt to a plugin's bad day would be a poor
+trade. Reusing a builtin name replaces that module.
+
+See `docs/PROMPT.md` for the format language.
 
 ## Key bindings
 

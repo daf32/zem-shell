@@ -242,9 +242,9 @@ class PluginManager:
         self._collect("themes", lambda record, paths: directories.extend(paths))
         return directories
 
-    def prompt_segments(self) -> dict:
+    def prompt_modules(self) -> dict:
         found: dict = {}
-        self._collect("prompt_segments", lambda record, mapping: found.update(dict(mapping)))
+        self._collect("prompt_modules", lambda record, mapping: found.update(dict(mapping)))
         return found
 
     def key_bindings(self) -> list:

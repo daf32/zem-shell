@@ -99,7 +99,7 @@ class Shell:
             activate_venv(self.context)
 
         self._sync_plugin_configs()
-        self.prompt_renderer = PromptRenderer(self, self.plugins.prompt_segments())
+        self.prompt_renderer = PromptRenderer(self, self.plugins.prompt_modules())
         self.plugins.notify("on_startup", self)
 
         if headless:
@@ -371,13 +371,11 @@ class Shell:
 
         ctx = self._prompt_context()
         prompt_html = self.prompt_renderer.render(
-            self.config.input.segments, ctx, colored=self.config.input.color_prompt
+            self.config.prompt.format, ctx, colored=self.config.input.color_prompt
         )
         rprompt = None
         if self.config.input.rprompt:
-            rprompt = self.prompt_renderer.render(
-                self.config.input.rprompt_segments, ctx
-            )
+            rprompt = self.prompt_renderer.render(self.config.prompt.right_format, ctx)
 
         text = self.session.prompt(prompt_html, rprompt=rprompt)
         while Parser.needs_continuation(text, self.config):

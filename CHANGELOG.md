@@ -6,11 +6,19 @@ All notable changes to Zem are documented here. The format follows
 
 ## [Unreleased]
 ### Added
-- **The prompt is made of named segments**, and their order is configuration:
-  `config set input.segments '["venv", "exit_code", "path", "git", "symbol"]'`,
-  with `input.rprompt_segments` for the right-hand side. Plugins contribute
-  their own through `prompt_segments()`, and can replace a builtin segment by
-  reusing its name.
+- **The prompt is a format string**, in the spirit of Starship:
+  `config set prompt.format '$venv$exit_code$path$git$symbol'`, with
+  `prompt.right_format` for the right-hand side. `$module` substitutes a
+  module, `[text](style)` styles what it contains, and `(...)` renders only
+  when something inside it produced output — so `$path( on $git)$symbol`
+  loses the word "on" along with the branch outside a repository. Each
+  module is configurable under `prompt.modules` with its own `format`,
+  `style` and `disabled`, and a style is either a theme colour key or a
+  literal like `bold green` / `fg:#ff8800`. New modules: `user`, `host`,
+  `jobs`. See `docs/PROMPT.md`.
+- Plugins contribute prompt modules through `prompt_modules()` — a module
+  reports variables and its format decides how they are shown, so users can
+  restyle a plugin's module without touching its code.
 - Plugins can add key bindings through `key_bindings()`; the shell's own are
   merged first, so `Ctrl-C` and `Ctrl-R` cannot be taken away by accident.
 
