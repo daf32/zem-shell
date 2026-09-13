@@ -80,8 +80,21 @@ jobs:
           if [ ! -s notes.md ]; then
             echo "No CHANGELOG section for $version; see the commit history." > notes.md
           fi
+      - name: Name the release
+        id: name
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # A milestone (X.0.0) is the release people point at, so it is
+          # named for the line it opens rather than for its tag.
+          case "$version" in
+            *.0.0) title="Zem ${version%.0.0}.0" ;;
+            *)     title="v$version" ;;
+          esac
+          echo "title=$title" >> "$GITHUB_OUTPUT"
       - uses: softprops/action-gh-release@v3
         with:
+          name: ${{ steps.name.outputs.title }}
           files: dist/*
           body_path: notes.md
           generate_release_notes: true
+          make_latest: "true"
