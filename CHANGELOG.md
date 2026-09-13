@@ -5,6 +5,21 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **The prompt is made of named segments**, and their order is configuration:
+  `config set input.segments '["venv", "exit_code", "path", "git", "symbol"]'`,
+  with `input.rprompt_segments` for the right-hand side. Plugins contribute
+  their own through `prompt_segments()`, and can replace a builtin segment by
+  reusing its name.
+- Plugins can add key bindings through `key_bindings()`; the shell's own are
+  merged first, so `Ctrl-C` and `Ctrl-R` cannot be taken away by accident.
+
+### Fixed
+- The uncoloured prompt (`input.color_prompt = false`) matches the coloured
+  one. It was a second, separate implementation: it printed the literal
+  `None` when no virtualenv was active, and ran the venv name straight into
+  the path without the brackets the coloured prompt used.
+
 
 ## [0.11.3] - 2026-09-12
 ### Added

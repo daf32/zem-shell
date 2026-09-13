@@ -63,6 +63,21 @@ class Plugin:
         """Directories of theme JSON files."""
         return ()
 
+    def prompt_segments(self) -> Mapping[str, Any]:
+        """Prompt segments, as `{"name": PromptSegment()}`.
+
+        Add the name to `input.segments` (or `input.rprompt_segments`) to
+        make it appear. Reusing a builtin name replaces that segment.
+        """
+        return {}
+
+    def key_bindings(self) -> Any:
+        """A prompt_toolkit `KeyBindings`, merged with the shell's own.
+
+        Return `None` for no bindings.
+        """
+        return None
+
     # -- lifecycle ---------------------------------------------------------
 
     def on_startup(self, shell) -> None:

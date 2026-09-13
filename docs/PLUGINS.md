@@ -70,6 +70,8 @@ Every hook is optional.
 | `hint_providers()` | `{"mytool.things": fn}` — values for specs to use |
 | `completers()` | `{"command": BaseArgCompleter}` for what a spec cannot express |
 | `themes()` | directories of theme JSON files |
+| `prompt_segments()` | `{"name": PromptSegment()}` — pieces of the prompt |
+| `key_bindings()` | a prompt_toolkit `KeyBindings`, merged with the shell's |
 
 And four lifecycle hooks:
 
@@ -84,6 +86,58 @@ And four lifecycle hooks:
 which is how a "did you mean" or an auto-`sudo` plugin would work. The first
 plugin to return a rewrite wins. Keep it fast — it is on the path of every
 command.
+
+## Prompt segments
+
+The prompt is a list of named segments, and `input.segments` is their order:
+
+```bash
+config set input.segments '["venv", "exit_code", "path", "git", "symbol"]'
+config set input.rprompt_segments '["duration", "time"]'
+```
+
+A plugin adds its own:
+
+```python
+from zem.ui.prompt import PromptSegment
+
+
+class KubeSegment(PromptSegment):
+    name = "kube"
+
+    def render(self, ctx):
+        # ctx has .shell, .cwd, .exit_code and .duration
+        context = current_kube_context()
+        return [("class:git_branch", f" ({context})")] if context else None
+
+
+class KubePlugin(Plugin):
+    def prompt_segments(self):
+        return {"kube": KubeSegment()}
+```
+
+Then `config set input.segments '["exit_code", "path", "kube", "symbol"]'`.
+
+Return `None` when there is nothing to show — that is how `git` disappears
+outside a repository. A segment that raises is skipped and logged, and the
+rest of the prompt still renders: losing your prompt to a plugin's bad day
+would be a poor trade. Reusing a builtin name replaces that segment.
+
+## Key bindings
+
+```python
+def key_bindings(self):
+    bindings = KeyBindings()
+
+    @bindings.add("c-g")
+    def _(event):
+        event.current_buffer.insert_text("git ")
+
+    return bindings
+```
+
+The shell's own bindings are merged first, so a plugin cannot take `Ctrl-C`
+or `Ctrl-R` away by accident.
 
 ## Metadata
 

@@ -242,6 +242,22 @@ class PluginManager:
         self._collect("themes", lambda record, paths: directories.extend(paths))
         return directories
 
+    def prompt_segments(self) -> dict:
+        found: dict = {}
+        self._collect("prompt_segments", lambda record, mapping: found.update(dict(mapping)))
+        return found
+
+    def key_bindings(self) -> list:
+        """Every plugin's key bindings, for `merge_key_bindings`."""
+        collected: list = []
+
+        def sink(record, bindings):
+            if bindings is not None:
+                collected.append(bindings)
+
+        self._collect("key_bindings", sink)
+        return collected
+
     def completers(self) -> dict:
         found: dict = {}
         self._collect("completers", lambda record, mapping: found.update(dict(mapping)))

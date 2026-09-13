@@ -33,6 +33,12 @@ class InputSettings(BaseModel):
     show_exit_code: bool = True
     color_prompt: bool = True
     auto_suggest: bool = True  # fish-style ghost text from history
+    #: Prompt segments, in order. Names come from `zem.ui.prompt` and from
+    #: plugins; an unknown one is skipped with a warning in the log.
+    segments: List[str] = Field(
+        default_factory=lambda: ["venv", "exit_code", "path", "git", "symbol"]
+    )
+    rprompt_segments: List[str] = Field(default_factory=lambda: ["duration", "time"])
 
 class HistorySettings(BaseModel):
     enable: bool = True
