@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.3] - 2026-09-13
 ### Changed
 - **`theme`, `logo` and `venv` ship as plugins** rather than as builtins, so
   `plugin list` shows them and `plugin disable theme` removes the command and
