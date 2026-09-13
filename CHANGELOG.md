@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.0] - 2026-09-13
 ### Added
 - **The prompt is a format string**, in the spirit of Starship:
   `config set prompt.format '$venv$exit_code$path$git$symbol'`, with
