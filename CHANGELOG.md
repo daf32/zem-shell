@@ -5,6 +5,19 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **`prompt` command**: `prompt list` draws every preset, `prompt set pure`
+  switches to one, `prompt configure` asks a few questions with previews
+  after each, and `prompt reset` goes back to the default. Six presets ship
+  (`classic`, `minimal`, `pure`, `powerline`, `two_line`, `verbose`); your
+  own go in `~/.zem/prompts/`. Previews use made-up values, so a preset
+  looks the same wherever you run it from.
+
+### Fixed
+- CI refuses a change that writes into an already-released CHANGELOG
+  section, which is what happens when a branch is rebased across someone
+  else's release.
+
 
 ## [0.12.1] - 2026-09-13
 ### Fixed

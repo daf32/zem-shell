@@ -1,0 +1,6 @@
+{
+  "name": "minimal",
+  "description": "Just where you are",
+  "format": "$path$symbol",
+  "right_format": ""
+}

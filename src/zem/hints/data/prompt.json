@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "command": "prompt",
+  "description": "Look at, preview and configure the prompt",
+  "fallback": "none",
+  "subcommands": [
+    {"name": "show", "description": "Show the current format, with a preview"},
+    {"name": "list", "description": "Preview every preset"},
+    {"name": "preview", "description": "Preview one preset",
+     "args": [{"name": "preset", "source": {"type": "provider", "name": "zem.prompt_presets"}}]},
+    {"name": "set", "description": "Switch to a preset",
+     "args": [{"name": "preset", "source": {"type": "provider", "name": "zem.prompt_presets"}}]},
+    {"name": "configure", "description": "Answer a few questions instead"},
+    {"name": "reset", "description": "Back to the default prompt"}
+  ]
+}
