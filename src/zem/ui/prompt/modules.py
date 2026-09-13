@@ -96,11 +96,12 @@ class GitModule(PromptModule):
             return None
         from zem.utils.git import get_git_info
 
-        info = get_git_info(ctx.cwd)
+        info = get_git_info(ctx.cwd, timeout_ms=_setting(ctx, "git", "timeout_ms"))
         if not info:
             return None
         branch, status = info
-        return {"branch": _shorten(branch), "status": status}
+        return {"branch": _shorten(branch, _setting(ctx, "git", "max_length") or 20),
+                "status": status}
 
 
 class SymbolModule(PromptModule):
@@ -175,6 +176,20 @@ BUILTIN_MODULES: tuple = (
     VenvModule, ExitCodeModule, PathModule, GitModule, SymbolModule,
     DurationModule, TimeModule, UserModule, HostModule, JobsModule,
 )
+
+
+def _setting(ctx: PromptContext, module: str, key: str):
+    """One option of a module's own config section, or ``None``.
+
+    The renderer keeps these settings to itself (it applies `format`,
+    `style` and `disabled`); a module that takes an option of its own --
+    how long to wait for git, how much of a branch name to show -- reads
+    it from here.
+    """
+    modules = getattr(ctx.config.prompt, "modules", {})
+    section = modules.get(module) if isinstance(modules, dict) else None
+    value = section.get(key) if isinstance(section, dict) else None
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _shorten(branch: str, max_length: int = 20) -> str:

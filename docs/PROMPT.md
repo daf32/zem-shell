@@ -65,6 +65,15 @@ A style is either a theme colour key (`path`, `git_branch`, `error` — these
 follow the active theme) or a literal prompt_toolkit style (`bold green`,
 `fg:#ff8800`, `bg:blue fg:white underline`).
 
+The `git` module takes two options of its own. `timeout_ms` (1000 by
+default) is how long the prompt waits for `git status` before it gives up
+and draws without it — worth lowering on a network filesystem, raising on a
+very large repository. `max_length` (20) is where a long branch name is cut:
+
+```bash
+config set prompt.modules '{"git": {"timeout_ms": 300, "max_length": 30}}'
+```
+
 ## The modules that ship
 
 | Module | Variables | Shows |
@@ -72,7 +81,7 @@ follow the active theme) or a literal prompt_toolkit style (`bold green`,
 | `venv` | `$name` | the active virtualenv |
 | `exit_code` | `$code` | the last exit status, green or red |
 | `path` | `$path` | the working directory, shortened |
-| `git` | `$branch`, `$status` | branch and dirty marker, inside a repo |
+| `git` | `$branch`, `$status` | branch (or short commit when detached) and `*` dirty, `+` ahead, `-` behind |
 | `symbol` | `$symbol` | the prompt character |
 | `jobs` | `$count` | how many background jobs, when there are any |
 | `user`, `host` | `$user`, `$host` | who and where |
