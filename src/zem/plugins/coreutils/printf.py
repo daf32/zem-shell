@@ -37,6 +37,7 @@ def _unescape(text: str) -> str:
 
 
 class PrintfCommand(BaseCommand):
+    name = "printf"
     help = "Format and print data"
     usage = "printf FORMAT [ARG...]"
     examples = [

@@ -2,6 +2,7 @@ from zem.builtins.base import BaseCommand
 
 
 class TrueCommand(BaseCommand):
+    name = "true"
     help = "Do nothing, successfully"
     usage = "true"
 

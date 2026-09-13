@@ -5,6 +5,14 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- **`echo`, `printf`, `test`, `[`, `true`, `false`, `:` ship as the
+  `coreutils` plugin**, and **`source`, `.`, `eval`, `exec`, `read`,
+  `command`, `type` as `scripting`**. Both are on by default and behave
+  exactly as before; `plugin disable coreutils` gives you `/bin/echo` and
+  `/bin/test` instead, and the shell keeps working. `command CMD` forcing an
+  external lookup is parser behaviour and does not depend on the plugin.
+
 
 ## [0.12.3] - 2026-09-13
 ### Changed

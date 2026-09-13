@@ -1,6 +1,6 @@
 from zem.builtins.base import BaseCommand
-from zem.builtins.type import describe
 from zem.errors.input_error import ArgumentError
+from zem.plugins.scripting.type import describe
 
 
 class CommandCommand(BaseCommand):

@@ -435,7 +435,7 @@ def test_detection_without_the_installer_on_path(tmp_path, monkeypatch):
 
 # -- what ships as a plugin ------------------------------------------------
 
-BUNDLED = ("theme", "logo", "venv", "weather")
+BUNDLED = ("theme", "logo", "venv", "weather", "coreutils", "scripting")
 
 
 def test_bundled_plugins_are_all_present(plugin_shell):
@@ -445,6 +445,8 @@ def test_bundled_plugins_are_all_present(plugin_shell):
 
 @pytest.mark.parametrize("name, command", [
     ("theme", "theme"), ("logo", "logo"), ("venv", "venv"), ("weather", "weather"),
+    ("coreutils", "echo"), ("coreutils", "printf"), ("coreutils", "["),
+    ("scripting", "source"), ("scripting", "type"), ("scripting", "read"),
 ])
 def test_a_bundled_plugin_provides_its_command(plugin_shell, name, command):
     shell = plugin_shell()
@@ -479,25 +481,63 @@ def _shell_in_a_fresh_process(tmp_path, disabled, line):
     )
 
 
-@pytest.mark.parametrize("name", ["theme", "logo", "venv"])
-def test_disabling_a_bundled_plugin_removes_its_command(tmp_path, name):
-    present = _shell_in_a_fresh_process(tmp_path, [], f"type {name}")
-    assert present.returncode == 0, present.stderr
+def _builtins_in_a_fresh_process(tmp_path, disabled) -> set:
+    """The shell's command names, from a new interpreter.
 
-    gone = _shell_in_a_fresh_process(tmp_path, [name], f"type {name}")
-    assert gone.returncode != 0
-    assert name in (gone.stdout + gone.stderr)
+    Asked of the registry rather than of `type`: macOS ships /usr/bin/type,
+    so a disabled builtin still "resolves" and the answer would be about
+    that utility instead of about Zem.
+    """
+    import json
+    import subprocess
+    import sys
+
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({
+        "disabled_plugins": disabled,
+        "rc": {"auto_create": False, "file": str(tmp_path / "zemrc")},
+        "history": {"enable": False, "file": str(tmp_path / "hist")},
+        "venv": {"auto": False},
+    }))
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "import json;from zem.core.shell import Shell;"
+         "print(json.dumps(sorted(Shell(headless=True, user_plugins_dir=None).commands)))"],
+        capture_output=True, text=True, timeout=60,
+        env={**os.environ, "ZEM_CONFIG_PATH": str(config), "ZEM_HINTS_PATH": ""},
+    )
+    assert result.returncode == 0, result.stderr
+    return set(json.loads(result.stdout.strip().splitlines()[-1]))
+
+
+@pytest.mark.parametrize("plugin, commands", [
+    ("theme", ["theme"]),
+    ("logo", ["logo"]),
+    ("venv", ["venv"]),
+    ("coreutils", ["echo", "printf", "test", "[", "true", "false", ":"]),
+    ("scripting", ["source", ".", "eval", "exec", "read", "command", "type"]),
+])
+def test_disabling_a_bundled_plugin_removes_its_builtins(tmp_path, plugin, commands):
+    present = _builtins_in_a_fresh_process(tmp_path, [])
+    assert set(commands) <= present, f"missing while enabled: {set(commands) - present}"
+
+    gone = _builtins_in_a_fresh_process(tmp_path, [plugin])
+    assert not (set(commands) & gone), f"still there: {set(commands) & gone}"
+    # The core is untouched.
+    assert {"cd", "pwd", "exit", "set", "export", "jobs"} <= gone
 
 
 def test_the_core_survives_every_plugin_being_off(tmp_path):
     """The shell is still a shell with nothing optional loaded."""
     result = _shell_in_a_fresh_process(
-        tmp_path, list(BUNDLED),
-        "cd /tmp && pwd && set X 1 && get X && jobs && type theme",
-    )
-    # `cd`, `pwd`, `set`, `get` and `jobs` all worked; only `type theme` failed.
+        tmp_path, list(BUNDLED), "cd /tmp && pwd && set X 1 && get X && jobs")
+    assert result.returncode == 0, result.stderr
     assert "/tmp" in result.stdout and "1" in result.stdout
-    assert result.returncode != 0
+
+    remaining = _builtins_in_a_fresh_process(tmp_path, list(BUNDLED))
+    assert {"cd", "pwd", "exit", "set", "unset", "export", "get",
+            "jobs", "fg", "bg", "kill", "wait", "disown",
+            "config", "plugin"} <= remaining
 
 
 def test_themes_come_from_the_theme_plugin(plugin_shell, isolated_config):
@@ -531,3 +571,28 @@ def test_every_bundled_plugin_is_importable_from_the_package():
     assert set(BUNDLED) <= found, f"missing from the package: {set(BUNDLED) - found}"
     for name in BUNDLED:
         importlib.import_module(f"zem.plugins.{name}")
+
+
+def test_the_shell_falls_back_to_external_tools_without_coreutils(tmp_path):
+    """Disabling `coreutils` costs the builtins, not the commands: the
+    shell finds /bin/echo and /bin/test instead."""
+    result = _shell_in_a_fresh_process(
+        tmp_path, ["coreutils"], "echo from-bin && test 1 -eq 1 && echo compared")
+    assert result.returncode == 0, result.stderr
+    assert "from-bin" in result.stdout and "compared" in result.stdout
+
+
+def test_command_forcing_still_works_without_the_scripting_plugin(tmp_path):
+    """`command CMD` is parser behaviour — it forces an external lookup —
+    and does not depend on the `command` builtin being loaded."""
+    result = _shell_in_a_fresh_process(tmp_path, ["scripting"], "command echo forced")
+    assert result.returncode == 0, result.stderr
+    assert "forced" in result.stdout
+
+
+def test_special_names_survive_the_move(full_shell, run):
+    """`:`, `[` and `.` take their names from a declaration, not a
+    filename, and moving into a package must not change them."""
+    assert run(full_shell, ":")[0] == 0
+    assert run(full_shell, "[ 1 -eq 1 ]")[0] == 0
+    assert run(full_shell, "[ 1 -eq 2 ]")[0] == 1

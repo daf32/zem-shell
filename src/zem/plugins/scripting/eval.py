@@ -2,6 +2,7 @@ from zem.builtins.base import BaseCommand
 
 
 class EvalCommand(BaseCommand):
+    name = "eval"
     help = "Join the arguments into one line and run it in this shell"
     usage = "eval [ARG...]"
     examples = [
