@@ -15,11 +15,20 @@ unknown option instead of ignoring it. See `src/zem/main.py`.
 
 ## Releases
 
-Merging a PR into `main` releases it, and the PR's **branch name** picks the
-bump (`.github/workflows/version-bump.yml`): `patch/` is the default however
-big the change, `minor/` marks a whole roadmap stage being finished, `major/`
-a milestone release. Any other prefix (`docs/`, `ci/`, `chore/`) releases
-nothing. Never edit `version` in `pyproject.toml` by hand.
+Merging a PR into `main` does **not** release it by default. The PR's
+**branch name** decides (`.github/workflows/version-bump.yml`): `minor/`
+releases what has accumulated, `major/` is a milestone ("version 1"), and
+every other prefix — `patch/` included, and it stays the default — merges
+without releasing, leaving its CHANGELOG entry under `## [Unreleased]`.
+A release exists to hand someone a set of changes that makes a story, not
+to count merges. To ship a fix on its own, run the "Version bump" workflow
+by hand from the Actions tab and choose the bump. Never edit `version` in
+`pyproject.toml` by hand.
+
+A milestone (`X.0.0`) is named for the line it opens (`Zem 1.0`) rather
+than for its tag; there is no separate "stable release" object on GitHub,
+and freezing a line means a `vX.x` maintenance branch, which this project
+has no use for yet.
 
 Write user-facing changes into the `## [Unreleased]` section of `CHANGELOG.md`;
 the workflow renames it to the new version. When a branch is rebased after

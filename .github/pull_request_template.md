@@ -8,7 +8,17 @@
 
 ## Release
 
-<!-- Branch name decides the release on merge: patch/... minor/... major/... — anything else = no release. -->
+<!--
+Branch name decides the release on merge:
+
+  patch/ (and ci/, docs/, chore/, ...)  merge it, no release; the CHANGELOG
+                                        entry waits under "Unreleased"
+  minor/                                release what has accumulated
+  major/                                a milestone: "version 1", "version 2"
+
+To ship something on its own, run the "Version bump" workflow by hand and
+pick the bump.
+-->
 
 ## Checklist
 
