@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.4] - 2026-09-13
 ### Changed
 - **`echo`, `printf`, `test`, `[`, `true`, `false`, `:` ship as the
   `coreutils` plugin**, and **`source`, `.`, `eval`, `exec`, `read`,
