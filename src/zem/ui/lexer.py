@@ -146,9 +146,13 @@ class ZemLexer(Lexer):
                     else:
                         # Regular $VAR syntax
                         var_name = ""
-                        while i < len(line) and (line[i].isalnum() or line[i] in "_?"):
-                            var_name += line[i]
+                        if i < len(line) and line[i] in "?$!#@*":
+                            var_name = line[i]
                             i += 1
+                        else:
+                            while i < len(line) and (line[i].isalnum() or line[i] == "_"):
+                                var_name += line[i]
+                                i += 1
                         tokens.append(("class:variable", var_name))
                     continue
                 
@@ -188,7 +192,9 @@ class ZemLexer(Lexer):
                     tokens.append(("class:operator", char))
                 
                 # Comment
-                elif char == self.config.operators.comment:
+                elif char == self.config.operators.comment and (
+                    i == 0 or line[i - 1].isspace() or line[i - 1] in ";|&()"
+                ):
                     tokens.append(("class:comment", line[i:]))
                     break
                 
@@ -235,7 +241,9 @@ class ZemLexer(Lexer):
                         "&",
                     ]
                     
-                    while i < len(line) and not line[i].isspace() and line[i] not in special_chars:
+                    while i < len(line) and not line[i].isspace() and (
+                        line[i] not in special_chars or line[i] == self.config.operators.comment
+                    ):
                         word += line[i]
                         i += 1
                     

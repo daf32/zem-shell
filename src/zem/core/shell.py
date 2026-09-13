@@ -732,6 +732,7 @@ class Shell:
                 if is_background:
                     # Detach: `[N] pid` like bash; reaped before later prompts.
                     self._notify(f"[{job.id}] {job.pgid}")
+                    self.context.variables["!"] = str(procs[-1].pid)
                     for t in threads:
                         t.join()
                     exit_code = 0
