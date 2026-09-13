@@ -6,19 +6,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class OperatorsConfig(BaseModel):
+    """The characters the parser treats as syntax.
+
+    Every one of these is honoured, and the two-character operators follow
+    the single ones: `&&` is `background` twice, `||` is `pipe` twice. The
+    grouping characters of `test` (`(`, `)`), `~` and `!` are not here
+    because they are not configurable.
+    """
+
     variable: str = "$"
     pipe: str = "|"
     quote: str = "'"
     double_quote: str = "\""
-    space: str = " "
     semicolon: str = ";"
     comment: str = "#"
     redirect_output: str = ">"
     redirect_append: str = ">>"
     redirect_input: str = "<"
     background: str = "&"
-    and_if: str = "&&"
-    or_if: str = "||"
     variable_start: str = "{"
     variable_end: str = "}"
     escape: str = "\\"
@@ -106,7 +111,19 @@ class HintsSettings(BaseModel):
     #: Where `hints install` looks for specs that do not ship with Zem.
     registry_url: str = "https://raw.githubusercontent.com/daf32/zem-hints/main"
 
-def unknown_config_keys(data: dict, model: type = None, prefix: tuple = ()) -> list[str]:
+#: Keys zem wrote into config.json and then stopped reading. They are not
+#: mistakes -- the file was generated with them -- so they are reported
+#: differently from a typo, with what replaced them.
+RETIRED_KEYS = {
+    "operators.and_if": "`&&` is the `background` operator twice",
+    "operators.or_if": "`||` is the `pipe` operator twice",
+    "operators.space": "words are split on any whitespace",
+}
+
+
+def unknown_config_keys(
+    data: dict, model: "type[BaseModel] | None" = None, prefix: tuple = ()
+) -> list[str]:
     """Dotted keys in ``data`` that no setting corresponds to.
 
     ``AppConfig`` ignores what it does not know, so a misspelt key would
@@ -114,10 +131,11 @@ def unknown_config_keys(data: dict, model: type = None, prefix: tuple = ()) -> l
     sections (``plugins``, ``prompt.modules``) are not descended into.
     """
     model = model or AppConfig
+    fields = model.model_fields
     unknown: list[str] = []
     for key, value in data.items():
         path = prefix + (str(key),)
-        field = model.model_fields.get(key)
+        field = fields.get(key)
         if field is None:
             unknown.append(".".join(path))
             continue
@@ -179,7 +197,7 @@ class AppConfig(BaseSettings):
     def validate_unique_operators(cls, v: OperatorsConfig) -> OperatorsConfig:
         """Ensure operator symbols are unique to avoid parsing conflicts."""
         items = v.model_dump()
-        seen = {}
+        seen: dict[str, str] = {}
         for name, val in items.items():
             if val in seen:
                 raise ValueError(

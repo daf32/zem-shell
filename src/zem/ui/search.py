@@ -1,5 +1,5 @@
 import re
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
@@ -270,7 +270,7 @@ class FuzzyHistorySearch:
             style="class:frame.border"
         )
 
-        app = Application(
+        app: Application[Optional[str]] = Application(
             layout=Layout(root_container, focused_element=search_field),
             key_bindings=kb,
             style=self.style,

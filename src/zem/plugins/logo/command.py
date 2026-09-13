@@ -16,7 +16,12 @@ class LogoCommand(BaseCommand):
     tags = ["plugin", "ui"]
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         
         # Get colors from shell config if available

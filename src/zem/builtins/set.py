@@ -19,7 +19,12 @@ class SetCommand(BaseCommand):
     ]
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         if not args:
             for name in sorted(context.variables):

@@ -80,6 +80,10 @@ checks that with a corpus of lines compared against `bash -c`
 - **No `if`/`for`/functions, no `$1` in scripts**: it is an interactive
   shell; run scripts with bash.
 
+Exit codes follow the usual conventions: `127` for a command that was not
+found, `126` for one that could not be run, `2` for a command used wrongly,
+`130` for one you interrupted with Ctrl-C.
+
 ## Non-interactive use
 
 ```bash

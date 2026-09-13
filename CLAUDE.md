@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Zem is a modular Python shell (Python ≥ 3.13) built on `prompt-toolkit` and `pydantic-settings`. The entry point is `zem`, defined in `pyproject.toml` and resolving to `zem.main:main`. Dependency management is done with `uv`.
+Zem is a modular Python shell (Python ≥ 3.10; CI tests 3.10 and 3.13) built on `prompt-toolkit` and `pydantic-settings`. The entry point is `zem`, defined in `pyproject.toml` and resolving to `zem.main:main`. Dependency management is done with `uv`.
 
 ## CLI
 
@@ -47,7 +47,7 @@ uv run pytest
 # Run a single test
 uv run pytest tests/test_parser.py::test_quotes_and_variables -v
 
-# Install `ax` globally as a uv tool (from project root)
+# Install `zem` globally as a uv tool (from project root)
 ./scripts/install_zem.sh
 ./scripts/uninstall_zem.sh
 
@@ -87,7 +87,7 @@ The runtime is a REPL composed of three layers: a parser produces an AST of pipe
 
 ### Configuration (`src/zem/config/settings.py`)
 
-`AppConfig` is a `BaseSettings` model with sections: `operators`, `input`, `history`, `rc`, `colors`, `venv`, `plugins`, plus `active_theme`. Sources, in priority order: init args → `JsonConfigSettingsSource` (path resolved per instance via `get_config_path()`) → env vars. The config file is auto-created from defaults if missing. `validate_unique_operators` rejects any two operators sharing the same symbol — keep this in mind when adding/renaming operators. `format_validation_error` renders pydantic errors as `loc: msg` lines.
+`AppConfig` is a `BaseSettings` model with sections: `operators`, `input`, `history`, `rc`, `colors`, `venv`, `plugins`, plus `active_theme`. Keys the schema does not know are reported at startup and refused by `config set`; `RETIRED_KEYS` names the ones zem used to write itself (`operators.and_if`, `or_if`, `space`) so they are reported as retired, not as typos. Sources, in priority order: init args → `JsonConfigSettingsSource` (path resolved per instance via `get_config_path()`) → env vars, which are only read under a `ZEM_` prefix (`env_prefix`). The config file is auto-created from defaults if missing. `validate_unique_operators` rejects any two operators sharing the same symbol — keep this in mind when adding/renaming operators. `format_validation_error` renders pydantic errors as `loc: msg` lines.
 
 All writes to `config.json` go through `config/store.py` (`update_raw`: flock + atomic replace). `config set` validates the candidate document with `AppConfig.model_validate` before writing. Version is read from package metadata (`zem.__version__`); `pyproject.toml` is the only place to bump it.
 
@@ -127,7 +127,7 @@ JSON files describing the `ColorScheme`, shipped by the `theme` **plugin** rathe
 
 ### Errors
 
-`src/zem/errors/` defines a `CLIError` base with subclasses for parser, input, environment, and execution errors. Each carries an `exit_code` that the shell propagates into `context.last_exit_code`. Builtins should raise these (especially `ArgumentError` from `input_error.py`) rather than printing directly.
+`src/zem/errors/` defines a `CLIError` base with subclasses for parser, input and execution errors. Each carries an `exit_code` that the shell propagates into `context.last_exit_code`: `ArgumentError` 2 (found the command, used it wrongly), `UnknownCommandError` 127 (did not find it), `ExecutionError` 3. Builtins should raise these rather than printing directly.
 
 ## Adding a builtin
 

@@ -37,7 +37,12 @@ class EchoCommand(BaseCommand):
     ]
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         newline = True
         interpret = False

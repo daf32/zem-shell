@@ -122,7 +122,7 @@ def needs_continuation(text: str, ops: "OperatorsConfig") -> bool:
         return False
     if stripped.endswith(ops.pipe):
         return True
-    if stripped.endswith(ops.and_if):
+    if stripped.endswith(ops.background * 2):
         prev = chars[len(stripped) - 2] if len(stripped) >= 2 else None
         return prev is not None and not prev[1] and prev[2] == NORMAL
     return False

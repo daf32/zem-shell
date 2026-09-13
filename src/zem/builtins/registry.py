@@ -5,17 +5,16 @@ from zem.builtins.base import BaseCommand
 
 
 class CommandRegistry:
-    """Registry for builtin commands."""
-    
-    _instance: Optional['CommandRegistry'] = None
+    """Every command the shell knows, by name.
+
+    A namespace of classmethods rather than an object: registration
+    happens at import time, from `BaseCommand.__init_subclass__`, long
+    before anything could hold an instance.
+    """
+
     _commands: Dict[str, BaseCommand] = {}
     _command_classes: Dict[str, type[BaseCommand]] = {}
-    
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-    
+
     @classmethod
     def register(cls, command_class: type[BaseCommand]) -> None:
         """Register a command class."""

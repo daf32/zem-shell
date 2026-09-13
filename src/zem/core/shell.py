@@ -9,6 +9,7 @@ from typing import Dict, Optional
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.key_binding import KeyBindingsBase
 from prompt_toolkit.styles import Style
 
 from zem.builtins import DEFAULT_USER_PLUGINS_DIR, load_plugins
@@ -23,6 +24,7 @@ from zem.core.parser import Parser
 from zem.core.scan import join_lines
 from zem.errors.base_error import CLIError
 from zem.errors.execute_error import ExecutionError
+from zem.errors.input_error import UnknownCommandError
 from zem.errors.parser_error import ParseError
 from zem.plugin.manager import PluginManager
 from zem.ui.completer import ZemCompleter
@@ -125,8 +127,8 @@ class Shell:
         termios.tcsetattr(self._tty_fd, termios.TCSANOW, new_attrs)
 
     def _warn_unknown_config_keys(self):
-        """A misspelt key in config.json is ignored; say so once, at startup."""
-        from zem.config.settings import get_config_path, unknown_config_keys
+        """A key in config.json that does nothing; say so once, at startup."""
+        from zem.config.settings import RETIRED_KEYS, get_config_path, unknown_config_keys
         from zem.config.store import read_raw
 
         try:
@@ -134,7 +136,13 @@ class Shell:
         except (OSError, ValueError):
             return
         for key in unknown:
-            sys.stderr.write(f"warning: config.json: unknown key '{key}' is ignored\n")
+            if key in RETIRED_KEYS:
+                sys.stderr.write(
+                    f"warning: config.json: '{key}' is no longer used "
+                    f"({RETIRED_KEYS[key]}); you can delete it\n"
+                )
+            else:
+                sys.stderr.write(f"warning: config.json: unknown key '{key}' is ignored\n")
 
     def _sync_plugin_configs(self):
         """Sync default plugin configurations to the config file."""
@@ -308,16 +316,17 @@ class Shell:
                 event.current_buffer.text = result
                 event.current_buffer.cursor_position = len(result)
 
+        bindings: KeyBindingsBase = kb
         plugin_bindings = self.plugins.key_bindings()
         if plugin_bindings:
             from prompt_toolkit.key_binding import merge_key_bindings
 
             # The shell's own bindings come first, so a plugin cannot take
             # Ctrl-C away by accident.
-            kb = merge_key_bindings([kb, *plugin_bindings])
+            bindings = merge_key_bindings([kb, *plugin_bindings])
 
         auto_suggest = AutoSuggestFromHistory() if self.config.input.auto_suggest else None
-        self.session = PromptSession(
+        self.session: PromptSession = PromptSession(
             history=history,
             lexer=ZemLexer(self),
             completer=ZemCompleter(self),
@@ -329,7 +338,7 @@ class Shell:
             # keystroke; in a worker it is also cancelled when the next one
             # arrives.
             complete_in_thread=True,
-            key_bindings=kb
+            key_bindings=bindings,
         )
 
     def _setup_signal_handlers(self):
@@ -418,7 +427,7 @@ class Shell:
 
     def _get_input(self):
         lexer = getattr(self.session, "lexer", None)
-        if hasattr(lexer, "clear_path_cache"):
+        if lexer is not None and hasattr(lexer, "clear_path_cache"):
             lexer.clear_path_cache()
 
         ctx = self._prompt_context()
@@ -435,16 +444,19 @@ class Shell:
             text = join_lines(text, more, self.config.operators)
         return text
 
+    #: Deliberately an ANSI colour rather than a theme one: this prefix has
+    #: to stay legible on a terminal whose theme the user has just broken.
+    ERROR_TAG = "<ansired><b>[error]</b></ansired>"
+
     def _print_error(self, message: str):
         from html import escape
 
         from prompt_toolkit import HTML, print_formatted_text
 
-        from zem.utils.colors import error_tag
         # `HTML` parses its argument as XML: a message quoting the user's
         # line (`1>&2`, `a<b`) would otherwise blow up instead of printing.
         print_formatted_text(
-            HTML(f'{error_tag(self.config)} {escape(message, quote=False)}'),
+            HTML(f"{self.ERROR_TAG} {escape(message, quote=False)}"),
             file=sys.stderr,
         )
 
@@ -593,9 +605,18 @@ class Shell:
         for unit in units:
             if forbid_background and unit["pipeline"][-1].get("background"):
                 raise ParseError("Background jobs are not allowed inside $(...)")
-            last_exit_code = self._execute_pipeline(
-                unit["pipeline"], final_stdout_fd=final_stdout_fd
-            )
+            try:
+                last_exit_code = self._execute_pipeline(
+                    unit["pipeline"], final_stdout_fd=final_stdout_fd
+                )
+            except (UnknownCommandError, ExecutionError) as e:
+                # A command that could not be found, or could not be run
+                # here, fails the way any command fails: it reports, it
+                # sets a status, and the rest of the line gets to decide
+                # what to do with it (`cmd || fallback`). Only a syntax
+                # error, which comes out of `units` itself, ends the line.
+                last_exit_code = getattr(e, "exit_code", 1)
+                self._print_error(str(e))
             self.context.last_exit_code = last_exit_code
 
             logic = unit["logic"]
@@ -640,7 +661,7 @@ class Shell:
     def _execute_pipeline(self, pipeline: list[dict], *, final_stdout_fd: int | None = None) -> int:
         """Execute a single pipeline using process groups."""
 
-        processes = []
+        processes: list[subprocess.Popen | threading.Thread] = []
         prev_pipe_read = None
         exit_code = 0
         pgid = None

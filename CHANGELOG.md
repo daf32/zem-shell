@@ -5,6 +5,33 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- **A command that cannot be found now exits with 127**, the code every
+  other shell uses and the one scripts test for. It used to exit with 2,
+  which is what a command that *was* found and used wrongly returns.
+- **A command that fails no longer ends the line.** `nosuchcmd || echo
+  fallback` now runs the fallback, `nosuchcmd; echo next` still echoes,
+  and `echo $(nosuchcmd)` reports the failure and echoes an empty
+  substitution — all as in bash. The error used to abort everything after
+  it, which made the status impossible to act on. A syntax error still
+  ends the line.
+- **`operators.and_if`, `operators.or_if` and `operators.space` are
+  retired.** They sat in every `config.json` without being read: `&&` is
+  the `background` operator twice, `||` is `pipe` twice, and words are
+  split on any whitespace. zem wrote those keys itself, so it now says
+  they can be deleted rather than calling them unknown.
+- **The bundled `weather` plugin was rewritten as the example it is meant
+  to be**: it returns an exit code, reports failures on stderr (so
+  `weather || echo offline` works), names what went wrong instead of
+  catching everything, takes `timeout_s` alongside `default_city`, and is
+  a real `Plugin`, so `plugin list` shows it and `plugin disable weather`
+  works. Ctrl-C during a slow request now ends the command.
+
+### Removed
+- Dead code: `zem/utils/colors.py` (only the error prefix was used, and it
+  ignored the configuration it was handed), `ThemeManager.has_light_variant`
+  / `has_dark_variant`, `CommandFailedError`, `ConfigNotFoundError` and
+  `ShellEnvironmentError`, and the unused singleton on `CommandRegistry`.
 
 ## [0.12.10] - 2026-09-13
 ### Fixed

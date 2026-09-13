@@ -178,3 +178,33 @@ def test_shell_warns_about_unknown_keys_at_startup(
     shell._warn_unknown_config_keys()
     err = capsys.readouterr().err
     assert "unknown key 'histroy'" in err and "unknown key 'input.promt'" in err
+
+
+def test_retired_keys_are_reported_as_no_longer_used(
+    make_headless_shell, monkeypatch, tmp_path, capsys
+):
+    path = tmp_path / "config.json"
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
+    write_raw(str(path), {"operators": {"and_if": "&&", "or_if": "||", "space": " "}})
+    shell = make_headless_shell()
+    shell._warn_unknown_config_keys()
+    err = capsys.readouterr().err
+    assert "'operators.and_if' is no longer used" in err
+    assert "you can delete it" in err
+    assert "unknown key" not in err  # a generated key is not a typo
+
+
+def test_config_set_still_refuses_a_retired_key(full_shell, run, monkeypatch, tmp_path):
+    path = tmp_path / "config.json"
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
+    write_raw(str(path), {})
+    assert run(full_shell, "config set operators.or_if '||'")[0] == 1
+
+
+def test_two_character_operators_follow_the_single_ones():
+    from zem.core.scan import needs_continuation
+
+    ops = AppConfig(operators={"background": "@", "pipe": "!"}).operators
+    assert needs_continuation("a @@", ops)      # `&&` is `background` twice
+    assert needs_continuation("a !", ops)
+    assert not needs_continuation("a @", ops)   # a lone `&` is background

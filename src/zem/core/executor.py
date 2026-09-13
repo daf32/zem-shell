@@ -38,6 +38,16 @@ def managed_fd(fd: Optional[int], mode: str = "r"):
             pass
 
 
+class BuiltinThread(threading.Thread):
+    """The worker a builtin runs in, carrying the code it exited with.
+
+    A plain `Thread` has nowhere to put a result, and the shared
+    `context.last_exit_code` would race between the stages of a pipeline.
+    """
+
+    exit_code: int = 0
+
+
 class CommandExecutor:
     """Executes commands with proper resource management."""
 
@@ -63,9 +73,9 @@ class CommandExecutor:
         Takes ownership of the given fds (they are closed on return). Any
         ``None`` stream falls back to the process-level ``sys.*`` stream.
         """
-        stdin_obj: Optional[TextIO] = sys.stdin
-        stdout_obj: Optional[TextIO] = sys.stdout
-        stderr_obj: Optional[TextIO] = sys.stderr
+        stdin_obj: TextIO = sys.stdin
+        stdout_obj: TextIO = sys.stdout
+        stderr_obj: TextIO = sys.stderr
 
         exit_code = 0
         try:
@@ -136,13 +146,13 @@ class CommandExecutor:
         stdin_fd: Optional[int] = None,
         stdout_fd: Optional[int] = None,
         stderr_fd: Optional[int] = None,
-    ) -> threading.Thread:
+    ) -> BuiltinThread:
         """Execute a builtin in a worker thread (pipeline stages).
 
-        The builtin's exit code is stashed on the returned ``Thread`` as a
-        ``.exit_code`` attribute; the caller (``Shell._execute_pipeline``)
-        reads it after ``join()`` and writes it to ``context.last_exit_code``
-        from the main thread. This keeps the shared exit-code slot free of
+        The builtin's exit code lands on the returned thread's
+        ``exit_code``; the caller (``Shell._execute_pipeline``) reads it
+        after ``join()`` and writes it to ``context.last_exit_code`` from
+        the main thread. This keeps the shared exit-code slot free of
         cross-thread races when multiple builtins run in the same pipeline.
 
         The worker takes ownership of *duplicates* of the caller's fds: the
@@ -153,17 +163,16 @@ class CommandExecutor:
 
         def run_command():
             try:
-                thread.exit_code = self._run_builtin(  # type: ignore[attr-defined]
+                thread.exit_code = self._run_builtin(
                     command, args, in_fd, out_fd, err_fd
                 )
             except BaseException:
-                thread.exit_code = 1  # type: ignore[attr-defined]
+                thread.exit_code = 1
                 raise
 
         # Use daemon=True so threads don't prevent shell shutdown.
         # Threads are explicitly joined in _execute_pipeline, so this is safe.
-        thread = threading.Thread(target=run_command, daemon=True)
-        thread.exit_code = 0  # type: ignore[attr-defined]
+        thread = BuiltinThread(target=run_command, daemon=True)
         self._active_processes.append(thread)
         thread.start()
         return thread
@@ -239,7 +248,7 @@ class CommandExecutor:
     
     def clear_finished(self):
         """Remove finished processes and threads from the active list."""
-        still_running = []
+        still_running: list[Union[subprocess.Popen, threading.Thread]] = []
         for p in self._active_processes:
             if isinstance(p, subprocess.Popen):
                 if p.poll() is None:

@@ -1,8 +1,9 @@
 import os
 import re
-from typing import Callable, List, Tuple
+from typing import Callable
 
 from prompt_toolkit.document import Document
+from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.lexers import Lexer
 
 
@@ -96,15 +97,15 @@ class ZemLexer(Lexer):
         # Default - no special styling
         return ""
 
-    def lex_document(self, document: Document) -> Callable[[int], List[Tuple[str, str]]]:
+    def lex_document(self, document: Document) -> Callable[[int], StyleAndTextTuples]:
         """Return a function that lexes a specific line."""
         
-        def get_line(lineno: int) -> List[Tuple[str, str]]:
+        def get_line(lineno: int) -> StyleAndTextTuples:
             if lineno >= len(document.lines):
                 return []
                 
             line = document.lines[lineno]
-            tokens: List[Tuple[str, str]] = []
+            tokens: StyleAndTextTuples = []
             
             i = 0
             is_first_word = True
