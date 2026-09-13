@@ -435,7 +435,8 @@ def test_detection_without_the_installer_on_path(tmp_path, monkeypatch):
 
 # -- what ships as a plugin ------------------------------------------------
 
-BUNDLED = ("theme", "logo", "venv", "weather", "coreutils", "scripting")
+BUNDLED = ("theme", "logo", "venv", "weather", "coreutils", "scripting",
+           "dirstack", "history")
 
 
 def test_bundled_plugins_are_all_present(plugin_shell):
@@ -443,10 +444,24 @@ def test_bundled_plugins_are_all_present(plugin_shell):
     assert set(BUNDLED) <= names
 
 
+def test_no_bundled_plugin_fails_to_load(plugin_shell):
+    """The guard that catches a move gone wrong.
+
+    Every extraction so far has left an import pointing at the old
+    location, and the failure is quiet by design: the plugin records the
+    error, the rest load, and the only symptom is commands that are not
+    there. This makes it loud, without anyone having to list the plugins.
+    """
+    broken = {r.name: r.error for r in plugin_shell().plugins.loaded if r.error}
+    assert not broken, broken
+
+
 @pytest.mark.parametrize("name, command", [
     ("theme", "theme"), ("logo", "logo"), ("venv", "venv"), ("weather", "weather"),
     ("coreutils", "echo"), ("coreutils", "printf"), ("coreutils", "["),
     ("scripting", "source"), ("scripting", "type"), ("scripting", "read"),
+    ("dirstack", "pushd"), ("dirstack", "popd"), ("dirstack", "dirs"),
+    ("history", "history"),
 ])
 def test_a_bundled_plugin_provides_its_command(plugin_shell, name, command):
     shell = plugin_shell()
@@ -516,6 +531,8 @@ def _builtins_in_a_fresh_process(tmp_path, disabled) -> set:
     ("venv", ["venv"]),
     ("coreutils", ["echo", "printf", "test", "[", "true", "false", ":"]),
     ("scripting", ["source", ".", "eval", "exec", "read", "command", "type"]),
+    ("dirstack", ["pushd", "popd", "dirs"]),
+    ("history", ["history"]),
 ])
 def test_disabling_a_bundled_plugin_removes_its_builtins(tmp_path, plugin, commands):
     present = _builtins_in_a_fresh_process(tmp_path, [])
@@ -596,3 +613,14 @@ def test_special_names_survive_the_move(full_shell, run):
     assert run(full_shell, ":")[0] == 0
     assert run(full_shell, "[ 1 -eq 1 ]")[0] == 0
     assert run(full_shell, "[ 1 -eq 2 ]")[0] == 1
+
+
+def test_aliases_stay_in_the_core(plugin_shell):
+    """Deliberate: the parser expands aliases, but `alias` is the only way
+    to define one. As a plugin it could be switched off, and then every
+    `alias` line in ~/.zemrc would fail and no alias could exist at all —
+    the same reason `set` is core while variables live in the context.
+    """
+    shell = plugin_shell()
+    assert "alias" in shell.commands and "unalias" in shell.commands
+    assert not any(r.name == "aliases" for r in shell.plugins.loaded)

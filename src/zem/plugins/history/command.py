@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 
 class HistoryCommand(BaseCommand):
+    name = "history"
     help = "Show or edit command history"
     usage = "history [N] [PATTERN] | history -c | history -d N"
     tags = ["builtin"]

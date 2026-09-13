@@ -18,6 +18,7 @@ def format_stack(context) -> str:
 
 
 class PushdCommand(BaseCommand):
+    name = "pushd"
     help = "Save the current directory on a stack and change to another"
     usage = "pushd [DIR]"
     examples = [

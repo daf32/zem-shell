@@ -5,6 +5,14 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- **`pushd`, `popd`, `dirs` ship as the `dirstack` plugin**, and **`history`
+  as `history`**. Both are on by default. Recording history, `!!` expansion
+  and Ctrl-R searching stay in the core — the plugin is only the command
+  that lists and prunes it; the directory stack itself lives on the
+  execution context, so disabling the plugin removes the commands, not the
+  data.
+
 
 ## [0.12.4] - 2026-09-13
 ### Changed
