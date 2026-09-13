@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.10] - 2026-09-13
 ### Fixed
 - **The git part of the prompt showed `+` for a branch that was behind its
   upstream and `-` for one that was ahead** — the two counts were read the
