@@ -6,7 +6,7 @@ class TrueCommand(BaseCommand):
     help = "Do nothing, successfully"
     usage = "true"
 
-    def execute(self, args, context, stdin=None, stdout=None) -> int:
+    def execute(self, args, context, stdin=None, stdout=None, stderr=None) -> int:
         return 0
 
 

@@ -334,16 +334,3 @@ class ThemeManager:
                 variants.append(name)
         
         return sorted(variants)
-    
-    def has_light_variant(self, name: str) -> bool:
-        """Check if theme has a light variant."""
-        base = name.lower().replace("_dark", "").replace("_light", "")
-        light_name = f"{base}_light"
-        return light_name in self.list_themes()
-    
-    def has_dark_variant(self, name: str) -> bool:
-        """Check if theme has a dark variant."""
-        base = name.lower().replace("_dark", "").replace("_light", "")
-        dark_name = f"{base}_dark"
-        # Also check base name without suffix (often the dark version)
-        return dark_name in self.list_themes() or base in self.list_themes()

@@ -22,7 +22,12 @@ class CdCommand(BaseCommand):
     ]
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         if len(args) > 1:
             raise ArgumentError(self.name, args, reason="too many arguments")

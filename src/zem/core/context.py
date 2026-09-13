@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
@@ -26,7 +26,9 @@ class ExecutionContext(BaseModel):
 
     history: List[str] = Field(default_factory=list)
     variables: Dict[str, str] = Field(default_factory=lambda: dict(os.environ))
-    exported: Optional[set[str]] = None
+    #: Filled in before validation when it is not given (see `_seed_exported`),
+    #: so the rest of the class can rely on it being a set.
+    exported: set[str] = Field(default_factory=set)
     running: bool = True
     exit_status: int = 0
     commands: Dict[str, BaseCommand] = Field(default_factory=dict)
@@ -44,17 +46,20 @@ class ExecutionContext(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @model_validator(mode="after")
-    def _default_exported(self):
+    @model_validator(mode="before")
+    @classmethod
+    def _seed_exported(cls, data):
         """When ``exported`` isn't given, every initial variable is exported.
 
         This keeps the default (``variables`` seeded from ``os.environ``)
         consistent, and makes an explicitly passed ``variables`` dict
-        hermetic: nothing from the real environment leaks in.
+        hermetic: nothing from the real environment leaks in. Done before
+        validation so the field itself is never ``None``.
         """
-        if self.exported is None:
-            self.exported = set(self.variables)
-        return self
+        if isinstance(data, dict) and data.get("exported") is None:
+            variables = data.get("variables")
+            return {**data, "exported": set(os.environ if variables is None else variables)}
+        return data
 
     # -- variable API -------------------------------------------------------
 

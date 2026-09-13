@@ -23,9 +23,10 @@ class ZemCompleter(Completer):
         self.shell = shell
         self.path_completer = EnhancedPathCompleter(expanduser=True)
         self.registry = CompleterRegistry()
+        plugins = getattr(shell, "plugins", None)
         self.hints = HintRegistry(
-            shell.config, extra_dirs=getattr(shell, "plugins", None).hint_spec_dirs()
-            if getattr(shell, "plugins", None) else (),
+            shell.config,
+            extra_dirs=plugins.hint_spec_dirs() if plugins is not None else (),
         )
         self._spec_completers: dict = {}
         self._register_command_completers()

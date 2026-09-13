@@ -13,7 +13,12 @@ class UnsetCommand(BaseCommand):
     usage = "unset [-v] NAME..."
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         if args and args[0] == "-v":
             args = args[1:]

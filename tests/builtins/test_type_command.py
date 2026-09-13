@@ -41,7 +41,7 @@ def test_command_bypasses_builtin_and_alias(full_shell, run):
     # builtin echo -E prints "a\tb" verbatim, and so does /bin/echo, so use
     # a builtin that has no external counterpart instead.
     code, _, err = run(full_shell, "command get X")
-    assert code == 2 and "Unknown command" in err  # no /usr/bin/get
+    assert code == 127 and "Unknown command" in err  # no /usr/bin/get
     run(full_shell, "alias echo='echo aliased'")
     assert run(full_shell, "echo x")[1] == "aliased x\n"
     assert run(full_shell, "command echo x")[1] == "x\n"

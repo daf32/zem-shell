@@ -41,19 +41,21 @@ class VenvCommand(BaseCommand):
         if subcommand == "activate":
             if len(args) > 2:
                 raise ArgumentError(self.name, args, reason="too many arguments")
+            path: Path
             if len(args) == 2:
                 path = Path(args[1]).expanduser()
                 if not is_valid_venv(path):
                     self._write_err(f"venv: {path}: not a virtual environment\n", stderr)
                     return 1
             else:
-                path = find_venv(Path.cwd())
-                if path is None:
+                found = find_venv(Path.cwd())
+                if found is None:
                     self._write_err(
                         "venv: no virtual environment found in current directory or parents\n",
                         stderr,
                     )
                     return 1
+                path = found
             activate_venv(context, path)
             self._write(f"✓ Activated venv: {path}\n", stdout)
             return 0

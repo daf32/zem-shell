@@ -13,7 +13,12 @@ class PwdCommand(BaseCommand):
     usage = "pwd [-L|-P]"
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         physical = False
         for arg in args:

@@ -725,7 +725,7 @@ class Parser:
 
     def _build_pipeline(self, segment_text: str, background: bool) -> list[dict]:
         pipeline_segments = self._split_by_pipe(segment_text)
-        commands = []
+        commands: list[dict] = []
         for pipe_seg in pipeline_segments:
             toks = self._tokenize(pipe_seg)
             if not toks:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from zem.ui.prompt import format as fmt
 from zem.ui.prompt.modules import BUILTIN_MODULES, PromptContext, PromptModule
@@ -26,7 +26,7 @@ class PromptRenderer:
     # -- public ------------------------------------------------------------
 
     def render(self, format_string: str, ctx: PromptContext,
-               colored: bool = True, sample: bool = False) -> object:
+               colored: bool = True, sample: bool = False) -> Any:
         """Render `format_string`; a plain string when `colored` is false.
 
         With `sample=True` every module reports made-up values instead of

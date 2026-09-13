@@ -189,8 +189,8 @@ def test_unknown_external_command_sets_error_exit_code(make_headless_shell, buil
     """A typo doesn't crash the shell; exit_code reflects the error."""
     shell = make_headless_shell(commands=builtins_for_pipeline)
     shell._execute_line("nope-cmd-xyz-not-real")
-    # UnknownCommandError → exit_code 2
-    assert shell.context.last_exit_code == 2
+    # UnknownCommandError → 127, what every shell answers for "not found"
+    assert shell.context.last_exit_code == 127
 
 
 # --------------------------------------------------------------------------
@@ -501,11 +501,16 @@ def test_substitution_does_not_change_exit_code(make_headless_shell, p4_builtins
     assert shell.context.last_exit_code == 0
 
 
-def test_substitution_error_propagates(make_headless_shell, p4_builtins, capfd):
+def test_substitution_error_is_reported_and_the_command_still_runs(
+    make_headless_shell, p4_builtins, capfd
+):
+    """Like bash: `echo $(nosuchcmd)` reports, then echoes nothing, exit 0."""
     shell = make_headless_shell(commands=p4_builtins)
     shell._execute_line("techo $(nope-cmd-xyz-not-real)")
-    assert shell.context.last_exit_code == 2
-    assert "Unknown command" in capfd.readouterr().err
+    captured = capfd.readouterr()
+    assert "Unknown command" in captured.err
+    assert captured.out == "\n"
+    assert shell.context.last_exit_code == 0
 
 
 def test_background_inside_substitution_is_rejected(make_headless_shell, p4_builtins, capfd):
@@ -546,3 +551,46 @@ def test_later_syntax_error_reached_only_after_earlier_units_run(
     assert captured.out == "ran\n"
     assert "Missing target" in captured.err
     assert shell.context.last_exit_code != 0
+
+
+# -- a failed command fails; it does not end the line -------------------------
+
+def test_a_missing_command_lets_the_rest_of_the_line_decide(
+    make_headless_shell, p4_builtins, capfd
+):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("nope-cmd-xyz-not-real || techo fallback")
+    captured = capfd.readouterr()
+    assert "Unknown command" in captured.err
+    assert captured.out == "fallback\n"
+    assert shell.context.last_exit_code == 0
+
+
+def test_a_missing_command_short_circuits_an_and_chain(
+    make_headless_shell, p4_builtins, capfd
+):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("nope-cmd-xyz-not-real && techo never")
+    assert capfd.readouterr().out == ""
+    assert shell.context.last_exit_code == 127
+
+
+def test_a_missing_command_does_not_stop_a_semicolon_chain(
+    make_headless_shell, p4_builtins, capfd
+):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("nope-cmd-xyz-not-real; techo after")
+    assert capfd.readouterr().out == "after\n"
+
+
+def test_a_builtin_refused_in_a_pipeline_fails_that_unit_only(full_shell, run):
+    code, out, err = run(full_shell, "echo x | read A; echo still-here")
+    assert "cannot be used in a pipeline" in err
+    assert "still-here" in out
+
+
+def test_a_syntax_error_still_ends_the_line(make_headless_shell, p4_builtins, capfd):
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("techo one; techo two |")
+    out = capfd.readouterr().out
+    assert out == "one\n"  # the first unit ran, the broken one ended the line

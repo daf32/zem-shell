@@ -20,7 +20,12 @@ class ExportCommand(BaseCommand):
     ]
 
     def execute(
-        self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None
+        self,
+        args: list[str],
+        context: "ExecutionContext",
+        stdin=None,
+        stdout=None,
+        stderr=None,
     ) -> int:
         if not args or args == ["-p"]:
             env = context.child_env()

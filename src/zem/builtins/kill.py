@@ -38,7 +38,7 @@ class KillCommand(BaseCommand):
             self._write(" ".join(names) + "\n", stdout)
             return 0
 
-        sig = signal.SIGTERM
+        sig: int = signal.SIGTERM
         targets: list[str] = []
         i = 0
         while i < len(args):

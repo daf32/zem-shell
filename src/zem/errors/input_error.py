@@ -7,6 +7,15 @@ class InputError(CLIError):
     exit_code = 2
 
 class UnknownCommandError(InputError):
+    """A name that is neither a builtin, an alias, nor on PATH.
+
+    127 is what every other shell answers here, and what scripts and
+    wrappers check for; 2 belongs to a command that was found and used
+    wrongly.
+    """
+
+    exit_code = 127
+
     def __init__(self, command):
         super().__init__(f"Unknown command '{command}'")
 
