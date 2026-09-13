@@ -5,6 +5,32 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- **Ctrl-C now interrupts a builtin** (`read`, `weather`, `prompt configure`,
+  `plugin install`, a `$(...)` being collected) with exit status 130. Before,
+  the command kept running and, worse, the next line typed at the prompt was
+  silently dropped.
+- **A `PROMPT` or `INPUT` variable in the parent shell no longer stops zem
+  from starting.** Configuration is read from the environment only under a
+  `ZEM_` prefix (`ZEM_ACTIVE_THEME=nord zem`); bare section names used to be
+  parsed as JSON.
+- Plugins' `on_exit` hook ran twice when the shell was terminated with
+  SIGTERM.
+
+### Changed
+- **One history.** The arrow keys, Ctrl-R, `!!` and the `history` command
+  now share the same entries: the file is read at startup
+  (`history.load_on_start`), `history` lists previous sessions too, and the
+  file is trimmed to `history.max_entries` on exit (`history.rotate`).
+  `history.save_on_exit: false` keeps a session's history in memory only.
+  These three keys existed but did nothing.
+- `~/.zem_history` is created readable by its owner only (0600), like bash's;
+  an existing file keeps its permissions.
+
+### Added
+- `tests/interactive/`: the shell driven in a real pseudo-terminal through
+  pexpect (Ctrl-C, Ctrl-Z, `fg`/`bg`, `exit`, termios restore, SIGHUP to
+  jobs, history across sessions). Runs with the rest of the suite.
 
 ## [0.12.7] - 2026-09-13
 ### Fixed
