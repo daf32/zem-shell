@@ -337,7 +337,14 @@ class Parser:
         if text[start] == self.config.operators.variable_start:
             end = text.find(self.config.operators.variable_end, start)
             if end == -1:
-                return text[start+1:], len(text)
+                # Silently reading to the end of the line made `echo ${X`
+                # print the value of X, which hides the typo rather than
+                # reporting it.
+                raise ParseError(
+                    f"Unclosed '{self.config.operators.variable}"
+                    f"{self.config.operators.variable_start}': expected "
+                    f"'{self.config.operators.variable_end}'"
+                )
             return text[start+1:end], end + 1
         if text[start] in self.SPECIAL_VARS or text[start].isdigit():
             return text[start], start + 1

@@ -448,3 +448,13 @@ def test_substitution_in_double_quotes_with_pipe_inside():
     Parser('echo "$(a | b)"', {}, {}, AppConfig(),
            substitutor=lambda s: seen.append(s) or "x").parse()
     assert seen == ["a | b"]
+
+
+def test_unclosed_brace_in_a_variable_is_an_error():
+    # `echo ${X` used to print the value of X and hide the typo.
+    with pytest.raises(ParseError):
+        _args("echo ${X", {"X": "1"})
+    with pytest.raises(ParseError):
+        _args("echo ${", {})
+    assert _args("echo ${X}", {"X": "1"}) == ["echo", "1"]
+    assert _args("echo '${X'") == ["echo", "${X"]  # quoted: just text

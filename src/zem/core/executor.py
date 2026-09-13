@@ -21,20 +21,38 @@ class ProcessResult(Protocol):
         ...
 
 
+#: A shell carries bytes it did not choose: a file name in another
+#: encoding, the middle of a JPEG, output from a program that does not
+#: care about locales. `surrogateescape` lets those bytes through a
+#: builtin unharmed -- decoded to lone surrogates and written back out
+#: byte for byte -- instead of failing with a decoding error.
+STREAM_ERRORS = "surrogateescape"
+
+
 @contextmanager
 def managed_fd(fd: Optional[int], mode: str = "r"):
-    """Context manager for file descriptors."""
+    """Wrap ``fd`` in a text stream and close it when the block ends.
+
+    Takes ownership: the descriptor is closed whether or not it could be
+    wrapped, so a failure here cannot leak it.
+    """
     if fd is None:
         yield None
         return
-    
+
     try:
-        f = os.fdopen(fd, mode)
+        f = os.fdopen(fd, mode, encoding="utf-8", errors=STREAM_ERRORS)
+    except OSError:
+        # `os.fdopen` does not consume the descriptor when it fails, and
+        # `f` is unbound, so there is nothing for a `finally` to close.
+        os.close(fd)
+        raise
+    try:
         yield f
     finally:
         try:
             f.close()
-        except (OSError, AttributeError):
+        except OSError:
             pass
 
 

@@ -5,6 +5,20 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- **Bytes that are not valid UTF-8 pass through a builtin** instead of
+  ending in a decoding error: `read X < photo.jpg; echo $X` writes the
+  same bytes back, as every other shell does. Both the descriptors handed
+  to a builtin and the shell's own stdin and stdout now use
+  `surrogateescape`.
+- **`exit` no longer swallows the notice for a job that finished while you
+  were typing it.** It reaped the job table and threw away the `Done` and
+  `Exit N` lines it was handed.
+- **`echo ${X` is an error rather than the value of `X`.** An unclosed
+  `${` was read to the end of the line, which hid the typo.
+- A descriptor is closed even when it cannot be wrapped in a stream. The
+  cleanup assumed the wrapping had succeeded, so an I/O error there raised
+  `UnboundLocalError` and leaked the descriptor.
 
 ## [0.12.12] - 2026-09-13
 ### Fixed

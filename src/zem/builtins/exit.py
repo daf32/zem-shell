@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 from zem.builtins.base import BaseCommand
+from zem.core.jobs import format_notice
 from zem.errors.input_error import ArgumentError
 
 if TYPE_CHECKING:
@@ -24,7 +25,15 @@ class ExitCommand(BaseCommand):
         stdout=None,
         stderr=None,
     ) -> int:
-        context._jobs.reap()
+        # `reap` hands back the jobs whose state changed; they are the
+        # "Done" and "Exit N" lines the user is owed, and dropping them
+        # here meant a job that finished while you were typing `exit` was
+        # never reported at all.
+        current = context._jobs.current()
+        for job in context._jobs.reap():
+            marker = "+" if job is current else " "
+            self._write_err(format_notice(job, marker) + "\n", stderr)
+
         if context._jobs.stopped() and not context._exit_warned:
             context._exit_warned = True
             self._write_err("There are stopped jobs.\n", stderr)

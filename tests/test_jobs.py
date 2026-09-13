@@ -254,3 +254,22 @@ def test_wait_reports_status_of_already_finished_job(shell, run):
     assert run(shell, "wait %1")[0] == 128 + signal.SIGTERM
     code, _, err = run(shell, "wait %1")   # gone for good now
     assert code == 1 and "no such job" in err
+
+
+def test_exit_reports_a_job_that_finished_while_you_were_typing(shell, run):
+    """`exit` reaped the job table and threw the notices away."""
+    run(shell, "/bin/sleep 0.05 &")
+    time.sleep(0.4)
+    code, _, err = run(shell, "exit")
+    assert code == 0
+    assert "Done" in err and "sleep" in err
+
+
+def test_exit_still_refuses_while_a_job_is_stopped(shell, run):
+    run(shell, "/bin/sleep 5 &")
+    job = next(iter(shell.context._jobs))
+    os.killpg(job.pgid, signal.SIGSTOP)
+    time.sleep(0.3)
+    code, _, err = run(shell, "exit")
+    assert code == 1 and "stopped jobs" in err
+    os.killpg(job.pgid, signal.SIGKILL)
