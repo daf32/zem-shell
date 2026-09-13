@@ -4,6 +4,7 @@ from zem.builtins.base import BaseCommand
 
 
 class SourceCommand(BaseCommand):
+    name = "source"
     help = "Run commands from a file in the current shell"
     usage = "source FILE | . FILE"
     main_thread_only = True

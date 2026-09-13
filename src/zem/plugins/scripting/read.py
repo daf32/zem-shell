@@ -6,6 +6,7 @@ from zem.errors.input_error import ArgumentError
 
 
 class ReadCommand(BaseCommand):
+    name = "read"
     help = "Read a line from standard input into variables"
     usage = "read [-r] [-s] [-p PROMPT] [NAME...]"
     examples = [

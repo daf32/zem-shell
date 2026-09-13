@@ -27,6 +27,7 @@ def _unescape(text: str) -> str:
 
 
 class EchoCommand(BaseCommand):
+    name = "echo"
     help = "Print arguments"
     usage = "echo [-n] [-e|-E] [text...]"
     examples = [

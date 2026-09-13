@@ -5,6 +5,7 @@ from zem.builtins.base import BaseCommand
 
 
 class ExecCommand(BaseCommand):
+    name = "exec"
     help = "Replace the shell with the given command"
     usage = "exec CMD [ARG...]"
     examples = [

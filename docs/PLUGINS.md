@@ -10,10 +10,13 @@ two shapes, and they are the same API:
 There is no separate plugin registry, and there does not need to be: a plugin
 is code with dependencies, and PyPI already does that job.
 
-Zem uses the same API for its own optional parts. `theme`, `logo`, `venv` and
-`weather` are plugins, listed by `plugin list` and removable with
-`plugin disable` — the themes go with the `theme` plugin, so turning it off
-takes the command and the colours together. What stays in the core is the
+Zem uses the same API for its own optional parts: `coreutils` (`echo`,
+`printf`, `test`, `[`, `true`, `false`, `:`), `scripting` (`source`, `.`,
+`eval`, `exec`, `read`, `command`, `type`), `theme` (with the bundled
+themes), `logo`, `venv` and `weather`. All are listed by `plugin list` and
+removable with `plugin disable` — the themes go with the `theme` plugin, so
+turning it off takes the command and the colours together, and turning off
+`coreutils` leaves you with `/bin/echo` and `/bin/test`. What stays in the core is the
 parser, the executor, job control, the variable model, and the commands a
 shell cannot do without.
 

@@ -20,6 +20,7 @@ def describe(name: str, context) -> tuple[str, str] | None:
 
 
 class TypeCommand(BaseCommand):
+    name = "type"
     help = "Describe how a command name would be interpreted"
     usage = "type [-t] NAME..."
     examples = [
