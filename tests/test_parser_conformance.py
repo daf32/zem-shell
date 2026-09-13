@@ -228,3 +228,56 @@ def test_unset_variable_in_quotes_is_an_empty_argument():
 def test_empty_substitution_vanishes_when_unquoted():
     units = _units("echo $(x) y", substitutor=lambda s: "\n")
     assert units[0]["pipeline"][0]["args"] == ["y"]
+
+
+# -- a unit is expanded when it is read, not when it is yielded ---------------
+
+def test_logic_is_known_before_the_pipeline_is_built():
+    units = list(Parser("a && b; c", {}, {}, CFG).iter_units())
+    assert [u.logic for u in units] == ["&&", ";", None]
+    assert [u.expanded for u in units] == [False, False, False]
+
+
+def test_reading_the_pipeline_expands_that_unit_only():
+    units = list(Parser("a && b", {}, {}, CFG).iter_units())
+    assert units[0].pipeline[0]["name"] == "a"
+    assert units[0].expanded and not units[1].expanded
+
+
+def test_an_unread_unit_runs_no_substitution():
+    ran = []
+    parser = Parser("a && b $(danger)", {}, {}, CFG, substitutor=lambda t: ran.append(t) or "")
+    units = list(parser.iter_units())
+    assert units[0].pipeline[0]["name"] == "a"
+    assert ran == []  # the second unit was never asked for
+
+
+def test_reading_it_does_run_the_substitution():
+    ran = []
+    parser = Parser("b $(danger)", {}, {}, CFG, substitutor=lambda t: ran.append(t) or "out")
+    units = list(parser.iter_units())
+    assert units[0].pipeline[0]["args"] == ["out"]
+    assert ran == ["danger"]
+
+
+def test_the_pipeline_is_built_once():
+    calls = []
+    parser = Parser("a $(x)", {}, {}, CFG, substitutor=lambda t: calls.append(t) or "v")
+    unit = next(parser.iter_units())
+    assert unit.pipeline is unit.pipeline
+    assert calls == ["x"]
+
+
+def test_parse_stays_eager_and_raises_where_the_caller_expects_it():
+    with pytest.raises(ParseError):
+        Parser("echo ok; echo hi | ", {}, {}, CFG).parse()
+    units = Parser("a; b", {}, {}, CFG).parse()
+    assert all(u.expanded for u in units)
+
+
+def test_a_unit_still_reads_like_the_mapping_it_used_to_be():
+    (unit,) = Parser("echo hi", {}, {}, CFG).parse()
+    assert unit["logic"] is None
+    assert unit["pipeline"][0]["name"] == "echo"
+    with pytest.raises(KeyError):
+        unit["nope"]

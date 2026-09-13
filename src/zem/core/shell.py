@@ -602,12 +602,23 @@ class Shell:
         substitution).
         """
         last_exit_code = 0
+        joiner: str | None = None  # what links this unit to the previous one
         for unit in units:
-            if forbid_background and unit["pipeline"][-1].get("background"):
+            if not self._chain_continues(joiner, last_exit_code):
+                # Skipped, and deliberately not expanded: the `$(...)` of a
+                # command that is not going to run must not run either.
+                joiner = unit.logic
+                continue
+
+            pipeline = unit.pipeline
+            if not pipeline:
+                joiner = unit.logic
+                continue
+            if forbid_background and pipeline[-1].get("background"):
                 raise ParseError("Background jobs are not allowed inside $(...)")
             try:
                 last_exit_code = self._execute_pipeline(
-                    unit["pipeline"], final_stdout_fd=final_stdout_fd
+                    pipeline, final_stdout_fd=final_stdout_fd
                 )
             except (UnknownCommandError, ExecutionError) as e:
                 # A command that could not be found, or could not be run
@@ -618,14 +629,25 @@ class Shell:
                 last_exit_code = getattr(e, "exit_code", 1)
                 self._print_error(str(e))
             self.context.last_exit_code = last_exit_code
-
-            logic = unit["logic"]
-            if logic == "&&" and last_exit_code != 0:
-                break
-            if logic == "||" and last_exit_code == 0:
-                break
-            # `;` continues regardless of exit code
+            joiner = unit.logic
         return last_exit_code
+
+    @staticmethod
+    def _chain_continues(joiner: "str | None", status: int) -> bool:
+        """Whether a unit joined by ``joiner`` runs, given the status so far.
+
+        bash's rule, read left to right: `&&` needs the status to be zero,
+        `||` needs it not to be, `;` and the start of the line always run.
+        A unit that does not run leaves the status untouched, so the next
+        operator is judged against the same one. That is what makes
+        `a && b; c` run `c` when `a` fails, and `a || b && c` run `c` when
+        `a` succeeds.
+        """
+        if joiner == "&&":
+            return status == 0
+        if joiner == "||":
+            return status != 0
+        return True
 
     def _capture_output(self, text: str) -> str:
         """Run ``text`` and return its stdout — the engine behind ``$(...)``.

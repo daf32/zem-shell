@@ -1,5 +1,6 @@
 import os
 import re
+from functools import partial
 from typing import TYPE_CHECKING, Callable, Iterator, Optional
 
 from zem.core.scan import (
@@ -21,6 +22,48 @@ if TYPE_CHECKING:
 #: A logical unit before tokenization: its text, the operator that follows
 #: it (`&&`, `||`, `;` or None) and whether a `&` ended it.
 Segment = tuple[str, Optional[str], bool]
+
+
+class Unit:
+    """One logical unit of a command line: a pipeline and what follows it.
+
+    ``logic`` is known as soon as the line is split, but ``pipeline`` is
+    built only when it is asked for -- and a unit `&&` skipped over is
+    never asked. That is what keeps ``false && echo $(rm -rf /)`` from
+    running the substitution of a command it is not going to run.
+
+    Subscripting is kept (``unit["pipeline"]``) because that is how the
+    shell and the tests have always read a unit.
+    """
+
+    __slots__ = ("logic", "_build", "_pipeline")
+
+    def __init__(self, build: Callable[[], list[dict]], logic: Optional[str]):
+        self.logic = logic
+        self._build = build
+        self._pipeline: Optional[list[dict]] = None
+
+    @property
+    def pipeline(self) -> list[dict]:
+        if self._pipeline is None:
+            self._pipeline = self._build()
+        return self._pipeline
+
+    #: True once the pipeline has been built, without building it.
+    @property
+    def expanded(self) -> bool:
+        return self._pipeline is not None
+
+    def __getitem__(self, key: str):
+        if key == "pipeline":
+            return self.pipeline
+        if key == "logic":
+            return self.logic
+        raise KeyError(key)
+
+    def __repr__(self) -> str:
+        body = self._pipeline if self.expanded else "<not expanded>"
+        return f"Unit({body!r}, logic={self.logic!r})"
 
 
 class Parser:
@@ -657,28 +700,32 @@ class Parser:
 
     # -- units ---------------------------------------------------------------
 
-    def parse(self) -> list[dict]:
+    def parse(self) -> list[Unit]:
+        """Every unit of the line, expanded.
+
+        The eager half of the API: each `Unit` carries its `pipeline` (a
+        list of commands) and `logic`, the operator to evaluate *after*
+        it (`&&`, `||`, `;` or None). Expanding here means a syntax error
+        anywhere on the line is raised here, which is what a caller
+        holding the whole list expects.
         """
-        Returns a list of logical units.
-        Each unit is a dictionary:
-        {
-            "pipeline": list of commands,
-            "logic": "&&" | "||" | ";" | None (operator to evaluate AFTER this pipeline)
-        }
-        """
-        units = list(self.iter_units())
+        units = []
+        for unit in self.iter_units():
+            _ = unit.pipeline  # force: `parse()` promises a parsed line
+            units.append(unit)
         if not units:
             raise ParseError("Empty command")
         return units
 
-    def iter_units(self) -> Iterator[dict]:
+    def iter_units(self) -> Iterator[Unit]:
         """Yield logical units one at a time, tokenizing lazily.
 
-        Expansion of a unit (`$?`, `$(...)`, globs) happens only when the
-        previous unit has been consumed, so `false; echo $?` sees the
-        status of `false` — the shell executes each unit before pulling
-        the next one. Syntax errors in later units surface only when
-        reached, like in an interactive bash.
+        Expansion of a unit (`$?`, `$(...)`, globs) happens when its
+        `pipeline` is read, not when it is yielded, so `false; echo $?`
+        sees the status of `false` — the shell executes each unit before
+        looking into the next one — and a unit the shell decides to skip
+        is never expanded at all. Syntax errors in later units surface
+        only when reached, like in an interactive bash.
         """
         produced = yield from self._units(self.text, frozenset())
         if not produced:
@@ -717,10 +764,8 @@ class Parser:
                 )
                 continue
 
-            commands = self._build_pipeline(segment_text, background)
-            if commands:
-                produced += 1
-                yield {"pipeline": commands, "logic": logic_op}
+            produced += 1
+            yield Unit(partial(self._build_pipeline, segment_text, background), logic_op)
         return produced
 
     def _build_pipeline(self, segment_text: str, background: bool) -> list[dict]:
