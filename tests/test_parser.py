@@ -278,6 +278,58 @@ def test_ampersand_redirect_both():
     assert (c["stdout_file"], c["append"], c["stderr_to_stdout"]) == ("both", True, True)
 
 
+def test_stdout_to_stderr_forms():
+    for line in ("cmd >&2", "cmd 1>&2"):
+        c = _cmd(line)
+        assert c["stdout_to_stderr"] is True, line
+        assert (c["stdout_file"], c["stderr_to_stdout"], c["args"]) == (None, False, [])
+
+
+def test_stdout_to_stderr_does_not_create_a_file_named_ampersand():
+    # `>&2` used to parse as `>` into a file called `&`, with `2` left over
+    # as an argument.
+    c = _cmd("echo to-stderr >&2")
+    assert c["args"] == ["to-stderr"]
+    assert c["stdout_file"] is None and c["stdout_to_stderr"] is True
+
+
+def test_fd_dup_onto_itself_is_a_noop():
+    for line in ("cmd >&1", "cmd 1>&1", "cmd 2>&2"):
+        c = _cmd(line)
+        assert (c["stdout_to_stderr"], c["stderr_to_stdout"]) == (False, False), line
+        assert (c["stdout_file"], c["stderr_file"], c["args"]) == (None, None, [])
+
+
+def test_contradictory_fd_dups_take_the_last_one():
+    c = _cmd("cmd 2>&1 1>&2")
+    assert (c["stdout_to_stderr"], c["stderr_to_stdout"]) == (True, False)
+    c = _cmd("cmd 1>&2 2>&1")
+    assert (c["stdout_to_stderr"], c["stderr_to_stdout"]) == (False, True)
+
+
+def test_fd_dup_combines_with_a_file_redirect():
+    c = _cmd("cmd >&2 2> err")
+    assert (c["stdout_to_stderr"], c["stderr_file"]) == (True, "err")
+
+
+def test_fd_dup_before_a_pipe_and_background():
+    c = _cmd("cmd >&2 | other")
+    assert c["stdout_to_stderr"] is True and c["args"] == []
+    c = _parse("cmd 1>&2 &")[0]["pipeline"][0]
+    assert (c["stdout_to_stderr"], c["background"]) == (True, True)
+
+
+def test_fd_dup_rejects_unsupported_descriptors():
+    for line in ("cmd >&3", "cmd 2>&9", "cmd >&", "cmd >&1x"):
+        with pytest.raises(ParseError):
+            _parse(line)
+
+
+def test_quoted_fd_dup_stays_an_argument():
+    c = _cmd("echo '>&2'")
+    assert c["args"] == [">&2"] and c["stdout_to_stderr"] is False
+
+
 def test_fd_prefix_needs_to_be_glued():
     # `echo 2 > x` prints "2"; `echo 2> x` redirects stderr.
     c = _cmd("echo 2 > x")
