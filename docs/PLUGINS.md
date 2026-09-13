@@ -13,8 +13,15 @@ is code with dependencies, and PyPI already does that job.
 Zem uses the same API for its own optional parts: `coreutils` (`echo`,
 `printf`, `test`, `[`, `true`, `false`, `:`), `scripting` (`source`, `.`,
 `eval`, `exec`, `read`, `command`, `type`), `dirstack` (`pushd`, `popd`,
-`dirs`), `history` (the command that lists and prunes it), `theme` (with the
-bundled themes), `logo`, `venv` and `weather`. All are listed by `plugin list` and
+`dirs`), `history` (the command that lists and prunes it), `help`, `theme`
+(with the bundled themes), `logo`, `venv` and `weather` — nine in all, and
+every one of them removable.
+
+What is left in the core is the parser, the executor, job control, the
+variable model, `cd`/`pwd`/`exit`, `alias`/`unalias`, and the four commands
+that manage the shell itself: `config`, `plugin`, `hints`, `prompt`. Those
+last four stay because disabling them would leave no way to configure
+anything again. All are listed by `plugin list` and
 removable with `plugin disable` — the themes go with the `theme` plugin, so
 turning it off takes the command and the colours together, and turning off
 `coreutils` leaves you with `/bin/echo` and `/bin/test`. What stays in the core is the

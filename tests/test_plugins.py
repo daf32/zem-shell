@@ -436,7 +436,7 @@ def test_detection_without_the_installer_on_path(tmp_path, monkeypatch):
 # -- what ships as a plugin ------------------------------------------------
 
 BUNDLED = ("theme", "logo", "venv", "weather", "coreutils", "scripting",
-           "dirstack", "history")
+           "dirstack", "history", "help")
 
 
 def test_bundled_plugins_are_all_present(plugin_shell):
@@ -461,7 +461,7 @@ def test_no_bundled_plugin_fails_to_load(plugin_shell):
     ("coreutils", "echo"), ("coreutils", "printf"), ("coreutils", "["),
     ("scripting", "source"), ("scripting", "type"), ("scripting", "read"),
     ("dirstack", "pushd"), ("dirstack", "popd"), ("dirstack", "dirs"),
-    ("history", "history"),
+    ("history", "history"), ("help", "help"),
 ])
 def test_a_bundled_plugin_provides_its_command(plugin_shell, name, command):
     shell = plugin_shell()
@@ -533,6 +533,7 @@ def _builtins_in_a_fresh_process(tmp_path, disabled) -> set:
     ("scripting", ["source", ".", "eval", "exec", "read", "command", "type"]),
     ("dirstack", ["pushd", "popd", "dirs"]),
     ("history", ["history"]),
+    ("help", ["help"]),
 ])
 def test_disabling_a_bundled_plugin_removes_its_builtins(tmp_path, plugin, commands):
     present = _builtins_in_a_fresh_process(tmp_path, [])
@@ -624,3 +625,28 @@ def test_aliases_stay_in_the_core(plugin_shell):
     shell = plugin_shell()
     assert "alias" in shell.commands and "unalias" in shell.commands
     assert not any(r.name == "aliases" for r in shell.plugins.loaded)
+
+
+def test_the_core_is_what_a_shell_cannot_do_without(tmp_path):
+    """The boundary, written down.
+
+    Everything optional is a plugin; what remains is the parser, the
+    executor, job control, the variable model and the commands that manage
+    the shell itself. `config` and `plugin` stay because disabling them
+    would leave no way to enable anything again; `hints` and `prompt`
+    because they configure subsystems that are themselves core; `alias`
+    because it is the only way to define an alias.
+    """
+    remaining = _builtins_in_a_fresh_process(tmp_path, list(BUNDLED))
+    assert remaining == {
+        # the variable model
+        "set", "unset", "export", "get",
+        # aliases: the parser expands them, this defines them
+        "alias", "unalias",
+        # where you are, and leaving
+        "cd", "pwd", "exit",
+        # job control
+        "jobs", "fg", "bg", "kill", "wait", "disown",
+        # managing the shell itself
+        "config", "plugin", "hints", "prompt",
+    }

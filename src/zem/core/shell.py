@@ -157,7 +157,6 @@ class Shell:
                 with open(self.rc_file, "w", encoding="utf-8") as f:
                     f.write("# Zem Shell (Minimal Config)\n")
                     f.write("set SHELL zem\n")
-                    f.write("alias help='help'\n")
         except Exception as e:
             sys.stderr.write(f"Warning: Failed to create default {self.rc_file}: {e}\n")
 
