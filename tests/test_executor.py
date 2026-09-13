@@ -594,3 +594,49 @@ def test_a_syntax_error_still_ends_the_line(make_headless_shell, p4_builtins, ca
     shell._execute_line("techo one; techo two |")
     out = capfd.readouterr().out
     assert out == "one\n"  # the first unit ran, the broken one ended the line
+
+
+# -- `&&`, `||` and `;` chain the way bash chains them ------------------------
+
+# Each expectation was produced by running the same line through `bash -c`.
+CHAINS = [
+    ("false && echo never; echo after", "after\n"),
+    ("true && echo yes; echo after", "yes\nafter\n"),
+    ("false || echo fallback; echo after", "fallback\nafter\n"),
+    ("false && echo a && echo b; echo c", "c\n"),
+    ("true || echo skipped && echo runs", "runs\n"),
+    ("false; echo after-semicolon", "after-semicolon\n"),
+    ("true && false || echo recovered", "recovered\n"),
+    ("false && echo x || echo y", "y\n"),
+    ("true && echo one && echo two", "one\ntwo\n"),
+    ("false || false || echo last", "last\n"),
+]
+
+
+@pytest.mark.parametrize("line, expected", CHAINS, ids=[c[0] for c in CHAINS])
+def test_chains_follow_bash(full_shell, run, line, expected):
+    assert run(full_shell, line)[1] == expected
+
+
+def test_a_skipped_unit_leaves_the_status_alone(full_shell, run):
+    # `echo` never runs, so `$?` is still the 1 that `false` produced.
+    assert run(full_shell, "false && echo never")[0] == 1
+    assert run(full_shell, "true || echo never")[0] == 0
+
+
+def test_a_semicolon_after_a_broken_chain_resumes(full_shell, run):
+    code, out, _ = run(full_shell, "false && echo never; true; echo resumed")
+    assert out == "resumed\n" and code == 0
+
+
+def test_a_skipped_command_is_never_expanded(make_headless_shell, p4_builtins, capfd):
+    """`false && echo $(...)` must not run the substitution it skips."""
+    shell = make_headless_shell(commands=p4_builtins)
+    shell._execute_line("tfail && techo $(techo ran-anyway)")
+    assert capfd.readouterr().out == ""
+
+
+def test_a_skipped_command_does_not_expand_globs(full_shell, run, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    assert run(full_shell, "false && echo *.txt; echo after")[1] == "after\n"

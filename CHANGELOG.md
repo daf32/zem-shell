@@ -5,6 +5,16 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- **A failed `&&` no longer swallows the rest of the line.** `make && ./run;
+  cleanup` now runs `cleanup` when `make` fails, `false && a; b` runs `b`,
+  and `true || a && b` runs `b` — bash's rule, applied left to right: a
+  command that does not run leaves the status alone, so the next operator
+  is judged against the same one. Every case in the new test table was
+  taken from `bash -c`.
+  A skipped command is not expanded either, so `false && echo $(rm -rf x)`
+  never starts the substitution — which is exactly what the old
+  stop-the-line behaviour was accidentally protecting.
 
 ## [0.12.11] - 2026-09-13
 ### Changed
