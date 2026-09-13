@@ -45,6 +45,29 @@ def _configure_logging():
     pkg_logger.setLevel(level)
 
 
+def _configure_streams():
+    """Let raw bytes through the shell's own stdin and stdout.
+
+    A shell carries bytes it did not choose, and Python's streams refuse
+    the ones that are not valid UTF-8: `read X < photo.jpg; echo $X`
+    ended with a decoding error where every other shell copies the bytes.
+    `surrogateescape` decodes them to lone surrogates and writes them back
+    out unchanged, which is the same treatment the descriptors handed to a
+    builtin get (`zem.core.executor.STREAM_ERRORS`).
+
+    stderr is left alone: its default already escapes what it cannot
+    encode instead of failing, and a diagnostic is meant to be read.
+    """
+    for stream in (sys.stdin, sys.stdout):
+        reconfigure = getattr(stream, "reconfigure", None)
+        try:
+            reconfigure(errors="surrogateescape")  # type: ignore[misc]
+        except (AttributeError, TypeError, ValueError, OSError):
+            # Not a text stream we can reconfigure (a captured stream in a
+            # test, a closed one): nothing to do, and nothing to say.
+            pass
+
+
 class _Args:
     """What the command line asked for."""
 
@@ -139,6 +162,7 @@ def main(argv: "list[str] | None" = None) -> int:
     if isinstance(parsed, int):
         return parsed
 
+    _configure_streams()
     _configure_logging()
     try:
         if parsed.command is not None or parsed.script is not None or parsed.read_stdin:
