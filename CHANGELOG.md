@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.8] - 2026-09-13
 ### Fixed
 - **Ctrl-C now interrupts a builtin** (`read`, `weather`, `prompt configure`,
   `plugin install`, a `$(...)` being collected) with exit status 130. Before,
