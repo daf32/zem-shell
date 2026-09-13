@@ -369,6 +369,69 @@ def test_stderr_to_stdout_in_pipeline(tmp_path, make_headless_shell, p1_builtins
     assert sorted(out.read_text().splitlines()) == ["err", "out"]
 
 
+def test_stdout_to_stderr(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("techo to-stderr >&2")
+    captured = capfd.readouterr()
+    assert (captured.out, captured.err) == ("", "to-stderr\n")
+
+
+def test_stdout_to_stderr_writes_no_file(tmp_path, monkeypatch, make_headless_shell,
+                                         p1_builtins, capfd):
+    """`>&2` used to create a file named `&` in the cwd."""
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("techo to-stderr >&2")
+    assert capfd.readouterr().err == "to-stderr\n"
+    assert list(work.iterdir()) == []
+
+
+def test_stdout_to_stderr_follows_a_redirected_stderr(tmp_path, make_headless_shell,
+                                                      p1_builtins, capfd):
+    err = tmp_path / "err"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"twriteserr 2> {err} 1>&2")
+    assert sorted(err.read_text().splitlines()) == ["err", "out"]
+    assert capfd.readouterr() == ("", "")
+
+
+def test_stdout_to_stderr_starves_the_next_pipeline_stage(tmp_path, make_headless_shell,
+                                                          p1_builtins, capfd):
+    out = tmp_path / "out"
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line(f"techo hidden >&2 | tcat > {out}")
+    assert out.read_text() == ""
+    assert capfd.readouterr().err == "hidden\n"
+
+
+def test_fd_dup_onto_itself_leaves_streams_alone(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("twriteserr >&1 2>&2")
+    captured = capfd.readouterr()
+    assert (captured.out, captured.err) == ("out\n", "err\n")
+
+
+def test_external_stdout_to_stderr(tmp_path, monkeypatch, make_headless_shell,
+                                   p1_builtins, capfd):
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("/bin/echo external >&2")
+    captured = capfd.readouterr()
+    assert (captured.out, captured.err) == ("", "external\n")
+    assert list(work.iterdir()) == []
+
+
+def test_unsupported_fd_dup_is_a_parse_error(make_headless_shell, p1_builtins, capfd):
+    shell = make_headless_shell(commands=p1_builtins)
+    shell._execute_line("techo x >&3")
+    assert shell.context.last_exit_code != 0
+    assert "file descriptor" in capfd.readouterr().err
+
+
 def test_external_stderr_redirect(tmp_path, make_headless_shell, p1_builtins, capfd):
     err = tmp_path / "err"
     shell = make_headless_shell(commands=p1_builtins)

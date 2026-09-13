@@ -5,6 +5,14 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- `>&2` no longer creates a file named `&`. The parser understands file
+  descriptor duplication in its general `N>&M` form, so `echo oops >&2`,
+  `cmd 1>&2` and the self-duplications `>&1` / `2>&2` behave like they do in
+  bash; only `2>&1` used to be recognised. A descriptor other than 1 or 2
+  (`>&3`) is now a parse error instead of a stray file.
+- Error messages are escaped before they are rendered, so one quoting the
+  offending line (`1>&2`, `a<b`) prints instead of crashing the shell.
 
 ## [0.12.0] - 2026-09-13
 ### Added

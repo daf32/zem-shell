@@ -384,10 +384,17 @@ class Shell:
         return text
 
     def _print_error(self, message: str):
+        from html import escape
+
         from prompt_toolkit import HTML, print_formatted_text
 
         from zem.utils.colors import error_tag
-        print_formatted_text(HTML(f'{error_tag(self.config)} {message}'), file=sys.stderr)
+        # `HTML` parses its argument as XML: a message quoting the user's
+        # line (`1>&2`, `a<b`) would otherwise blow up instead of printing.
+        print_formatted_text(
+            HTML(f'{error_tag(self.config)} {escape(message, quote=False)}'),
+            file=sys.stderr,
+        )
 
     # -- job control ---------------------------------------------------------
 
@@ -619,6 +626,7 @@ class Shell:
                 stderr_file = cmd_info.get("stderr_file")
                 stderr_append = cmd_info.get("stderr_append", False)
                 stderr_to_stdout = cmd_info.get("stderr_to_stdout", False)
+                stdout_to_stderr = cmd_info.get("stdout_to_stderr", False)
 
                 is_last = i == len(pipeline) - 1
                 current_stdin = prev_pipe_read if i > 0 else None
@@ -658,6 +666,15 @@ class Shell:
                     # `2>&1` / `&>`: stderr shares stdout's destination. When
                     # stdout is the terminal there is nothing to duplicate.
                     current_stderr = track(os.dup(current_stdout))
+
+                if stdout_to_stderr:
+                    # `>&2` / `1>&2`: stdout follows stderr's destination —
+                    # this shell's own fd 2 unless `2>` moved it. A pipe
+                    # write end is dropped, so the next stage reads EOF.
+                    close(current_stdout)
+                    current_stdout = track(
+                        os.dup(current_stderr if current_stderr is not None else 2)
+                    )
 
                 command = None if cmd_info.get("force_external") else self.commands.get(cmd_name)
 
