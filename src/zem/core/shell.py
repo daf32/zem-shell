@@ -595,11 +595,11 @@ class Shell:
     ) -> int:
         """Run parsed units honouring `&&`, `||`, `;`. Returns the last exit code.
 
-        ``units`` may be a lazy iterator (see `Parser.iter_units`): each
-        unit is expanded right before it runs, so `$?` reflects the
-        previous unit on the same line. ``final_stdout_fd`` redirects the
-        stdout of every pipeline's last stage (used by command
-        substitution).
+        ``units`` may be a lazy iterator (see `Parser.iter_units`): a unit
+        is expanded right before it runs, so `$?` reflects the previous
+        unit on the same line, and a unit the chain skips is not expanded
+        at all. ``final_stdout_fd`` redirects the stdout of every
+        pipeline's last stage (used by command substitution).
         """
         last_exit_code = 0
         joiner: str | None = None  # what links this unit to the previous one
