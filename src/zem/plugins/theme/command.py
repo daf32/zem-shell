@@ -8,9 +8,12 @@ if TYPE_CHECKING:
 
 
 class ThemeCommand(BaseCommand):
+    # Declared, not derived: `__init_subclass__` takes the name from the
+    # file, and inside a plugin package the file is not called theme.py.
+    name = "theme"
     help = "Manage shell themes"
     usage = "theme [list|set|preview|export|import|install|variants] [name|path|url]"
-    tags = ["builtin", "ui"]
+    tags = ["plugin", "ui"]
     examples = [
         "theme                  - Show current theme",
         "theme list             - List available themes",

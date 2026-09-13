@@ -13,7 +13,7 @@ class VenvCommand(BaseCommand):
     name = "venv"
     help = "Manage Python virtual environments (activate/deactivate)"
     usage = "venv [activate [PATH] | deactivate]"
-    tags = ["builtin", "python"]
+    tags = ["plugin", "python"]
     examples = [
         "venv                 - Show the active venv",
         "venv activate        - Activate the nearest .venv/venv/env",

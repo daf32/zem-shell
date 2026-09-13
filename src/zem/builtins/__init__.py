@@ -1,4 +1,3 @@
-import zem.themes  # noqa: F401  -- keeps the theme data importable from the package
 from zem.plugin.manager import DEFAULT_USER_PLUGINS_DIR, PluginManager
 
 __all__ = ["DEFAULT_USER_PLUGINS_DIR", "load_plugins"]

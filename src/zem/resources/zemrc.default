@@ -1,7 +1,8 @@
 # Zem Shell Configuration File
 
-# Display welcome logo
-logo
+# Display welcome logo. `logo` comes from a plugin, so this stays quiet
+# if you turn it off with `plugin disable logo`.
+logo 2>/dev/null || true
 
 # Default Aliases
 alias l='ls -la'

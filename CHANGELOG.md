@@ -5,6 +5,19 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- **`theme`, `logo` and `venv` ship as plugins** rather than as builtins, so
+  `plugin list` shows them and `plugin disable theme` removes the command and
+  the bundled themes together. The core keeps what a shell cannot do without:
+  the parser, the executor, job control, the variable model, `cd`, `pwd`,
+  `exit`, `set`/`unset`/`export`/`get`, the job-control commands, and
+  `config`/`plugin` — turn those off and there would be no way back.
+- A plugin may now be a package, not just a single module, which is how a
+  plugin ships data alongside its code.
+- The default `~/.zemrc` calls `logo 2>/dev/null || true`, so disabling the
+  logo plugin does not produce an error on every start. Existing rc files are
+  not touched; edit the line yourself if you disable it.
+
 
 ## [0.12.2] - 2026-09-13
 ### Added

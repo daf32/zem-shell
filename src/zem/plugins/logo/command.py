@@ -8,9 +8,12 @@ if TYPE_CHECKING:
 
 
 class LogoCommand(BaseCommand):
+    # Declared, not derived: inside a plugin package the file is
+    # not called logo.py.
+    name = "logo"
     help = "Display Zem logo"
     usage = "logo [--version]"
-    tags = ["builtin", "ui"]
+    tags = ["plugin", "ui"]
 
     def execute(
         self, args: list[str], context: "ExecutionContext", stdin=None, stdout=None

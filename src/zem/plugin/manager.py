@@ -72,9 +72,11 @@ class PluginManager:
         """Import the builtins, then the plugins shipped with Zem.
 
         Builtins are not plugins: they are the shell, they cannot be
-        disabled, and they do not appear in `plugin list`. The modules in
-        `zem.plugins` do appear, so that a user can see and switch off what
-        ships with the shell.
+        disabled, and they do not appear in `plugin list`. Everything in
+        `zem.plugins` does appear, so a user can see and switch off what
+        ships with the shell. Packages are allowed there as well as
+        modules, because a plugin that carries data — themes, hint specs —
+        needs somewhere to put it.
         """
         import zem.builtins as builtins_pkg
         import zem.plugins as bundled_pkg
@@ -84,8 +86,6 @@ class PluginManager:
                 importlib.import_module(f"{builtins_pkg.__name__}.{module_info.name}")
 
         for module_info in pkgutil.iter_modules(bundled_pkg.__path__):
-            if module_info.ispkg:
-                continue
             record = LoadedPlugin(
                 name=module_info.name, plugin=None, origin="bundled",
                 source=f"{bundled_pkg.__name__}.{module_info.name}",
@@ -142,8 +142,6 @@ class PluginManager:
             sys.path.append(directory)
 
         for module_info in pkgutil.iter_modules([directory]):
-            if module_info.ispkg:
-                continue
             record = LoadedPlugin(
                 name=module_info.name, plugin=None, origin="user",
                 source=os.path.join(directory, f"{module_info.name}.py"),
