@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.9] - 2026-09-13
 ### Security
 - **`theme import` and `theme install` can no longer write outside
   `~/.zem/themes/`.** The file name came from the theme's own `name` field
