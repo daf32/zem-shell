@@ -1,10 +1,11 @@
 from zem.builtins._cwd import change_directory
 from zem.builtins.base import BaseCommand
-from zem.builtins.pushd import format_stack
 from zem.errors.input_error import ArgumentError
+from zem.plugins.dirstack.pushd import format_stack
 
 
 class PopdCommand(BaseCommand):
+    name = "popd"
     help = "Change to the directory on top of the stack and remove it"
     usage = "popd"
 
