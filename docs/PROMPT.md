@@ -7,6 +7,25 @@ config set prompt.format '$venv$exit_code$path$git$symbol'
 config set prompt.right_format '$duration$time'
 ```
 
+## Getting there quickly
+
+```
+prompt              what the prompt is now, with a preview
+prompt list         every preset, drawn
+prompt set pure     switch to one
+prompt configure    answer a few questions instead
+prompt reset        back to the default
+```
+
+Presets that ship: `classic` (the default), `minimal`, `pure` (two quiet
+lines), `powerline` (blocks and arrows, wants a Nerd Font), `two_line` (a box
+drawing, for long paths) and `verbose` (user, host, branch, jobs). Drop your
+own JSON in `~/.zem/prompts/` and it joins the list — same fields as below,
+plus a `name` and a `description`.
+
+Previews use made-up values, so a preset looks the same whether or not you
+happen to be in a repository with a virtualenv active.
+
 ## The format language
 
 | Construct | Meaning |

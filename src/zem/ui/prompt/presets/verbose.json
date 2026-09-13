@@ -1,0 +1,9 @@
+{
+  "name": "verbose",
+  "description": "Who, where, which branch, how long",
+  "format": "[$user](info)@[$host](comment) $path( on $git)$jobs$symbol",
+  "right_format": "$duration$time",
+  "modules": {
+    "git": {"format": "[$branch$status]($style)"}
+  }
+}

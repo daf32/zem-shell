@@ -1,0 +1,11 @@
+{
+  "name": "pure",
+  "description": "Two lines, quiet, in the spirit of zsh's pure",
+  "format": "$path( $git)\n$symbol",
+  "right_format": "$duration",
+  "modules": {
+    "path": {"style": "info"},
+    "git": {"format": "[$branch$status](comment)"},
+    "symbol": {"format": "[❯]($style) ", "style": "exit_code_ok"}
+  }
+}

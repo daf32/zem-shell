@@ -48,6 +48,11 @@ Zem is a modular Python-based shell focused on extensibility and speed.
 - **Configuration**: one validated JSON file (`config set` refuses values the shell
   could not start with), `~/.zemrc`, plugins in `~/.zem/plugins/`.
 
+- **A prompt you can shape**: `prompt.format` is a small language —
+  `$path( on $git)$symbol` loses the word "on" along with the branch outside a
+  repository. `prompt list` draws the presets, `prompt configure` walks you
+  through it. See [docs/PROMPT.md](docs/PROMPT.md).
+
 - **Plugins**: a `Plugin` subclass — one file in `~/.zem/plugins/`, or a package
   with a `zem.plugins` entry point — can add commands, completion, themes and
   hooks that see every line before and after it runs. `plugin list` shows what

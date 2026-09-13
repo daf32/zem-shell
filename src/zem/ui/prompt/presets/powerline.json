@@ -1,0 +1,12 @@
+{
+  "name": "powerline",
+  "description": "Solid blocks with arrows (needs a Nerd Font)",
+  "format": "$venv$path$git$symbol",
+  "right_format": "$duration$time",
+  "modules": {
+    "path": {"format": "[ $path ](bg:#3465a4 fg:#ffffff)[](fg:#3465a4)"},
+    "git": {"format": "[ $branch$status ](bg:#4e9a06 fg:#ffffff)[](fg:#4e9a06)"},
+    "venv": {"format": "[ $name ](bg:#75507b fg:#ffffff)[](fg:#75507b)"},
+    "symbol": {"format": " [$symbol]($style) "}
+  }
+}

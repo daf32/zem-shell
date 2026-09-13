@@ -26,8 +26,13 @@ class PromptRenderer:
     # -- public ------------------------------------------------------------
 
     def render(self, format_string: str, ctx: PromptContext,
-               colored: bool = True) -> object:
-        """Render `format_string`; a plain string when `colored` is false."""
+               colored: bool = True, sample: bool = False) -> object:
+        """Render `format_string`; a plain string when `colored` is false.
+
+        With `sample=True` every module reports made-up values instead of
+        looking at the world, so a preset can be previewed from anywhere --
+        outside a repository, with no virtualenv, on a first run.
+        """
         try:
             nodes = self._parse(format_string)
         except fmt.FormatError as exc:
@@ -36,7 +41,7 @@ class PromptRenderer:
 
         fragments = fmt.render(
             nodes,
-            resolve=lambda name: self._render_module(name, ctx),
+            resolve=lambda name: self._render_module(name, ctx, sample),
             style_map=self._style,
         )
         if colored:
@@ -50,7 +55,8 @@ class PromptRenderer:
             self._parsed[text] = fmt.parse(text)
         return self._parsed[text]
 
-    def _render_module(self, name: str, ctx: PromptContext) -> Optional[list]:
+    def _render_module(self, name: str, ctx: PromptContext,
+                       sample: bool = False) -> Optional[list]:
         module = self.modules.get(name)
         if module is None:
             self._warn(name, f"unknown prompt module {name!r}")
@@ -59,6 +65,12 @@ class PromptRenderer:
         settings = self._settings(name)
         if settings.get("disabled"):
             return None
+
+        if sample:
+            from zem.ui.prompt.presets import SAMPLE_VARIABLES
+
+            variables = SAMPLE_VARIABLES.get(name, {"value": name})
+            return self._render_with(module, name, settings, variables, ctx)
 
         try:
             variables = module.variables(ctx)
@@ -69,6 +81,10 @@ class PromptRenderer:
         if variables is None:
             return None
 
+        return self._render_with(module, name, settings, variables, ctx)
+
+    def _render_with(self, module, name: str, settings: dict, variables: dict,
+                     ctx: PromptContext) -> Optional[list]:
         module_format = settings.get("format") or module.default_format
         style = settings.get("style") or self._module_style(module, ctx)
         try:

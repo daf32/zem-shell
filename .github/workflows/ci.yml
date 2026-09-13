@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
@@ -28,6 +30,14 @@ jobs:
       - name: Mypy (baseline, non-blocking)
         run: uv run mypy
         continue-on-error: true
+
+      - name: CHANGELOG entries go in Unreleased
+        # A branch written before someone else's release, then rebased onto
+        # it, lands its entry inside the section that release just closed.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=50 origin "${{ github.base_ref }}"
+          uv run python scripts/check_changelog.py "origin/${{ github.base_ref }}"
 
   test:
     name: Test (${{ matrix.os }}, py${{ matrix.python }})

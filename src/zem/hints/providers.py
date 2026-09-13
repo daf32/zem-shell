@@ -409,6 +409,14 @@ def _zem_plugin_packages(ctx: SourceContext) -> list[Suggestion]:
     return [Suggestion(name, version) for name, version in installed_distributions()]
 
 
+@provider("zem.prompt_presets")
+def _zem_prompt_presets(ctx: SourceContext) -> list[Suggestion]:
+    from zem.ui.prompt.presets import load_presets
+
+    return [Suggestion(name, preset.description)
+            for name, preset in sorted(load_presets().items())]
+
+
 @provider("zem.themes")
 def _zem_themes(ctx: SourceContext) -> list[Suggestion]:
     from zem.config.settings import AppConfig

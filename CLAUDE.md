@@ -23,8 +23,14 @@ nothing. Never edit `version` in `pyproject.toml` by hand.
 
 Write user-facing changes into the `## [Unreleased]` section of `CHANGELOG.md`;
 the workflow renames it to the new version. When a branch is rebased after
-someone else's release, check that the entry did not land inside the section
-that release just closed.
+someone else's release, the entry tends to land inside the section that
+release just closed — CI now refuses that (`scripts/check_changelog.py`), but
+check it yourself when moving commits between branches.
+
+**Before pushing to the branch of an open PR, confirm the PR is still open**
+(`gh pr view <n> --json state`). A merged PR's branch accepts pushes and
+`gh pr edit` still updates the text, so work pushed after a merge lands
+nowhere and looks like it succeeded. This has happened twice.
 
 ## Common commands
 
@@ -90,6 +96,7 @@ All writes to `config.json` go through `config/store.py` (`update_raw`: flock + 
 - `lexer.py` — `ZemLexer` does live syntax classification (commands, variables, paths, flags, strings, errors). Invalid command names are rendered with the `error` color from the theme.
 - `completer.py` + `completers/` — `ZemCompleter` splits the line with `core.scan.word_at` (quote-aware, with offsets), expands a leading alias in full, then picks who completes the command in `_completer_for`: a **user** hint spec → a Python `BaseArgCompleter` from `get_completer()` (`cd` only, now) → a **bundled** hint spec → `EnhancedPathCompleter`, which completes the *current word* (prompt_toolkit's `PathCompleter` would take the whole line). The word under the cursor comes from `Word.text`, not `get_word_before_cursor()`, which cuts at dashes. System commands come from `utils.executables.get_system_commands()`, cached per `PATH` value. `PromptSession` runs completion with `complete_in_thread=True` because specs may shell out.
 - `prompt/` — the prompt as a format string (`prompt.format`, `prompt.right_format`). `format.py` parses the mini-language (`$module`, `[text](style)`, conditional `(...)`, backslash escapes) into nodes and renders them; `modules.py` holds the builtin modules, which report *variables* rather than fragments so their own format string decides the layout; `renderer.py` joins the two, applies per-module config from `prompt.modules`, and maps a style name to `class:x` when it is a theme key or a shell style class, otherwise passes it to prompt_toolkit verbatim (`bold green`, `fg:#ff8800`). A module returning `None`, an unknown module name, a module that raises, or a format that does not parse each costs that piece alone — never the whole prompt. `colored=False` renders the same thing as plain text, replacing the separate implementation the text prompt used to have.
+- `prompt/presets/` + `prompt/presets.py` — ready-made prompt styles as JSON (bundled, plus `~/.zem/prompts/`), and `SAMPLE_VARIABLES`, the made-up values `render(..., sample=True)` uses so a preview looks the same outside a repository. The `prompt` builtin (`builtins/prompt.py`) shows, lists, previews, sets and resets them, and `prompt configure` is a question-and-preview wizard; it is `main_thread_only` because it reads stdin.
 - `search.py` — `FuzzyHistorySearch` (Ctrl+R) merges file-history with in-memory `context.history`; its style is built from the theme colours.
 - `history.py` — `ZemFileHistory` adds `clear()` (used by `history -c`). Ghost-text suggestions come from `AutoSuggestFromHistory` (`input.auto_suggest`).
 

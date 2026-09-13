@@ -1,0 +1,6 @@
+{
+  "name": "classic",
+  "description": "Zem's default: venv, status, path, branch",
+  "format": "$venv$exit_code$path$git$symbol",
+  "right_format": "$duration$time"
+}

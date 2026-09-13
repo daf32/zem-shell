@@ -1,0 +1,10 @@
+{
+  "name": "two_line",
+  "description": "A box drawing over two lines, for long paths",
+  "format": "[┌─](comment)$venv$path( on $git)\n[└─](comment)$symbol",
+  "right_format": "$duration$time",
+  "modules": {
+    "git": {"format": "[$branch$status]($style)"},
+    "path": {"format": "[$path]($style)"}
+  }
+}
