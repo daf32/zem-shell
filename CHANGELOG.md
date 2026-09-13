@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.11] - 2026-09-13
 ### Changed
 - **A command that cannot be found now exits with 127**, the code every
   other shell uses and the one scripts test for. It used to exit with 2,
