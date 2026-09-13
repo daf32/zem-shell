@@ -5,6 +5,24 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- **The git part of the prompt showed `+` for a branch that was behind its
+  upstream and `-` for one that was ahead** — the two counts were read the
+  wrong way round.
+- A detached HEAD showed the word `HEAD`; it now shows the short commit.
+
+### Changed
+- **The prompt asks git once instead of six times.** A single
+  `git status --porcelain=v2 --branch` answers branch, ahead/behind and
+  dirty, which takes ~11 ms where the six calls took ~60 ms, and it is
+  isolated like the completion helpers are: its own session (a git helper
+  can no longer take the terminal and hang the prompt), no stdin, and
+  `GIT_OPTIONAL_LOCKS=0`, so drawing a prompt never touches
+  `.git/index.lock` while you are running git in that repository.
+- The `git` prompt module takes `timeout_ms` (default 1000) and
+  `max_length` (default 20) under `prompt.modules.git`. The old code gave
+  each of its six calls half a second, so a slow repository could hold the
+  prompt for three.
 
 ## [0.12.9] - 2026-09-13
 ### Security
