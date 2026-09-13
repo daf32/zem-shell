@@ -189,7 +189,9 @@ Any top-level key can also come from the environment under a `ZEM_` prefix
 ## ⚙️ Configuration (`config.json`)
 
 Edit the file directly, or from inside the shell with `config set KEY VALUE`
-(values are validated against the schema before they are written; `config list`
+(values are validated against the schema before they are written, keys the
+schema does not know are refused, and a stale key in the file is reported at
+startup; `config list`
 shows every key):
 
 ```json

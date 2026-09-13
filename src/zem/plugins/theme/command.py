@@ -33,7 +33,7 @@ class ThemeCommand(BaseCommand):
         stdout=None,
         stderr=None,
     ) -> int:
-        from zem.utils.themes import ThemeManager
+        from zem.utils.themes import ThemeError, ThemeManager
 
         shell = getattr(context, "_shell", None)
         if shell is None:
@@ -132,45 +132,40 @@ class ThemeCommand(BaseCommand):
         elif subcommand == "export":
             if len(args) < 2:
                 raise ArgumentError(self.name, args, reason="expected <name>")
-            
+
             name = args[1]
             path = f"{name}.json"
-            success = manager.export_theme(name, path)
-            
-            if not success:
-                self._write_err(f"theme: failed to export '{name}'\n", stderr)
+            try:
+                manager.export_theme(name, path)
+            except ThemeError as exc:
+                self._write_err(f"theme: {exc}\n", stderr)
                 return 1
             self._write(f"Theme exported to {path}\n", stdout)
-        
+
         elif subcommand == "import":
             if len(args) < 2:
                 raise ArgumentError(self.name, args, reason="expected <path>")
-            
+
             import os
             path = os.path.expanduser(args[1])
-            name = manager.import_theme(path)
-            
-            if not name:
-                self._write_err(f"theme: failed to import theme from {path}\n", stderr)
+            try:
+                name = manager.import_theme(path)
+            except ThemeError as exc:
+                self._write_err(f"theme: {exc}\n", stderr)
                 return 1
             self._write(f"Theme '{name}' imported successfully\n", stdout)
             self._write(f"Use 'theme set {name}' to apply it\n", stdout)
-        
+
         elif subcommand == "install":
             if len(args) < 2:
                 raise ArgumentError(self.name, args, reason="expected <url>")
-            
+
             url = args[1]
             self._write(f"Downloading theme from {url}...\n", stdout)
-            
-            name = manager.install_theme(url)
-            
-            if not name:
-                self._write_err(
-                    "theme: failed to install theme "
-                    "(make sure the URL points to a valid JSON theme file)\n",
-                    stderr,
-                )
+            try:
+                name = manager.install_theme(url)
+            except ThemeError as exc:
+                self._write_err(f"theme: {exc}\n", stderr)
                 return 1
             self._print_colored([
                 (config.colors.exit_code_ok, "✓ "),

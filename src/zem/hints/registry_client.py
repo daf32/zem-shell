@@ -114,18 +114,30 @@ def install(base: str, name: str, target_dir: Path,
     return path
 
 
+#: More than this is not a spec or an index; stop reading rather than
+#: letting a misconfigured URL fill memory.
+MAX_DOWNLOAD_BYTES = 4 * 1024 * 1024
+
+
 def _get(url: str) -> bytes:
-    if not url.startswith(("https://", "http://")):
-        raise RegistryError(f"refusing to fetch a non-HTTP URL: {url}")
+    from zem.utils.net import UnsafeURL, check_url
+
+    try:
+        check_url(url)
+    except UnsafeURL as exc:
+        raise RegistryError(str(exc)) from None
     try:
         with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as response:  # noqa: S310
-            return response.read()
+            data = response.read(MAX_DOWNLOAD_BYTES + 1)
     except urllib.error.HTTPError as exc:
         if exc.code == 404:
             raise RegistryError(f"{url}: not found in the registry") from exc
         raise RegistryError(f"{url}: HTTP {exc.code}") from exc
     except (urllib.error.URLError, OSError, ValueError) as exc:
         raise RegistryError(f"{url}: {exc}") from exc
+    if len(data) > MAX_DOWNLOAD_BYTES:
+        raise RegistryError(f"{url}: larger than {MAX_DOWNLOAD_BYTES // (1024 * 1024)} MiB")
+    return data
 
 
 def _read_cache(path: Path, base: str) -> Optional[list[dict]]:

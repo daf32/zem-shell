@@ -1,14 +1,32 @@
 """Theme manager for Zem Shell."""
 import json
-import os
 import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
-class ThemeValidationError(Exception):
-    """Raised when theme validation fails."""
-    pass
+class ThemeError(Exception):
+    """A theme could not be imported, installed or exported; the message
+    says why, in words meant for the user."""
+
+
+#: What a theme may be called: it becomes a file name under `~/.zem/themes`,
+#: so nothing that could name another directory.
+THEME_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+#: A theme is a few dozen colours; anything bigger is not one.
+MAX_THEME_BYTES = 256 * 1024
+
+
+def theme_name(raw: object) -> str:
+    """Normalise a theme name, or raise :class:`ThemeError`."""
+    name = str(raw).strip().lower().replace(" ", "_")
+    if not THEME_NAME.match(name):
+        raise ThemeError(
+            f"{str(raw)!r} is not a valid theme name "
+            "(letters, digits, '_' and '-', up to 64 characters)"
+        )
+    return name
 
 
 class ThemeManager:
@@ -215,66 +233,91 @@ class ThemeManager:
         
         return "\n".join(preview_lines)
     
-    def export_theme(self, name: str, path: str) -> bool:
-        """Export current colors as a theme file."""
+    def export_theme(self, name: str, path: str) -> None:
+        """Write the current colours as a theme file; raises :class:`ThemeError`."""
         theme_data = {
-            "name": name,
+            "name": theme_name(name),
             "author": "User",
             "type": "custom",
             "colors": self.config.colors.model_dump()
         }
-        
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(theme_data, f, indent=4)
-            return True
-        except Exception:
-            return False
-    
-    def import_theme(self, path: str) -> Optional[str]:
-        """Import a theme from file to user themes directory."""
+        except OSError as exc:
+            raise ThemeError(f"cannot write {path}: {exc.strerror}") from exc
+
+    def import_theme(self, path: str) -> str:
+        """Copy a theme file into the user themes directory.
+
+        Returns the name it was stored under. Raises :class:`ThemeError`
+        for a file that cannot be read, is not a valid theme, or names
+        itself something that is not a plain name.
+        """
         try:
             with open(path, "r", encoding="utf-8") as f:
                 theme_data = json.load(f)
-            
-            self._user_themes_dir.mkdir(parents=True, exist_ok=True)
-            name = theme_data.get("name", Path(path).stem).lower().replace(" ", "_")
-            
-            dest_path = self._user_themes_dir / f"{name}.json"
-            with open(dest_path, "w", encoding="utf-8") as f:
-                json.dump(theme_data, f, indent=4)
+        except OSError as exc:
+            raise ThemeError(f"cannot read {path}: {exc.strerror}") from exc
+        except ValueError as exc:
+            raise ThemeError(f"{path}: not valid JSON ({exc})") from exc
+        return self._store(theme_data, fallback_name=Path(path).stem)
 
-            self._cached_themes = None
-            
-            return name
-        except Exception:
-            return None
-    
     HTTP_TIMEOUT = 10  # seconds; theme install blocks the shell
 
-    def install_theme(self, url: str) -> Optional[str]:
-        """Download and install a theme from URL."""
-        import shutil
-        import tempfile
+    def install_theme(self, url: str) -> str:
+        """Download a theme and store it like :meth:`import_theme`.
+
+        Only https (or http to this machine) is accepted: the file lands
+        in the user's home directory under a name it chooses itself.
+        """
+        import urllib.error
         import urllib.request
+        from urllib.parse import urlsplit
+
+        from zem.utils.net import UnsafeURL, check_url
 
         try:
-            tmp_fd, tmp_path = tempfile.mkstemp(suffix='.json')
-            os.close(tmp_fd)
+            check_url(url)
+        except UnsafeURL as exc:
+            raise ThemeError(str(exc)) from None
+        try:
+            with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response:  # noqa: S310
+                raw = response.read(MAX_THEME_BYTES + 1)
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            raise ThemeError(f"cannot download {url}: {exc}") from exc
+        if len(raw) > MAX_THEME_BYTES:
+            raise ThemeError(f"{url}: larger than {MAX_THEME_BYTES // 1024} KiB, not a theme")
+        try:
+            theme_data = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise ThemeError(f"{url}: not valid JSON ({exc})") from exc
+        return self._store(theme_data, fallback_name=Path(urlsplit(url).path).stem or "theme")
 
-            with urllib.request.urlopen(url, timeout=self.HTTP_TIMEOUT) as response, \
-                    open(tmp_path, "wb") as out:
-                shutil.copyfileobj(response, out)
-            with open(tmp_path, "r", encoding="utf-8") as f:
-                json.load(f)
+    def _store(self, theme_data: object, fallback_name: str) -> str:
+        """Validate ``theme_data`` and write it under its (checked) name."""
+        if not isinstance(theme_data, dict):
+            raise ThemeError("a theme is a JSON object with a 'colors' section")
+        name = theme_name(theme_data.get("name") or fallback_name)
+        is_valid, errors = self.validate_theme(theme_data, name)
+        if not is_valid:
+            raise ThemeError("invalid theme: " + "; ".join(errors))
 
-            name = self.import_theme(tmp_path)
-            os.unlink(tmp_path)
+        self._user_themes_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = self._user_themes_dir / f"{name}.json"
+        # `theme_name` already forbids separators; this is the belt to
+        # that pair of braces.
+        if dest_path.resolve().parent != self._user_themes_dir.resolve():
+            raise ThemeError(f"{name!r} would be written outside the themes directory")
+        try:
+            with open(dest_path, "w", encoding="utf-8") as f:
+                json.dump(theme_data, f, indent=4)
+        except OSError as exc:
+            raise ThemeError(f"cannot write {dest_path}: {exc.strerror}") from exc
 
-            return name
-        except Exception:
-            return None
-    
+        self._cached_themes = None
+        return name
+
     def get_theme_variants(self, base_name: str) -> List[str]:
         """Get all variants of a theme (e.g., dracula, dracula_light)."""
         themes = self.list_themes()

@@ -106,6 +106,28 @@ class HintsSettings(BaseModel):
     #: Where `hints install` looks for specs that do not ship with Zem.
     registry_url: str = "https://raw.githubusercontent.com/daf32/zem-hints/main"
 
+def unknown_config_keys(data: dict, model: type = None, prefix: tuple = ()) -> list[str]:
+    """Dotted keys in ``data`` that no setting corresponds to.
+
+    ``AppConfig`` ignores what it does not know, so a misspelt key would
+    otherwise sit in the file forever, silently doing nothing. Free-form
+    sections (``plugins``, ``prompt.modules``) are not descended into.
+    """
+    model = model or AppConfig
+    unknown: list[str] = []
+    for key, value in data.items():
+        path = prefix + (str(key),)
+        field = model.model_fields.get(key)
+        if field is None:
+            unknown.append(".".join(path))
+            continue
+        annotation = field.annotation
+        if isinstance(value, dict) and isinstance(annotation, type) \
+                and issubclass(annotation, BaseModel):
+            unknown.extend(unknown_config_keys(value, annotation, path))
+    return unknown
+
+
 def format_validation_error(error) -> list[str]:
     """``loc: msg`` lines for a pydantic ``ValidationError``."""
     lines = []

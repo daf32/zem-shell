@@ -5,6 +5,25 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Security
+- **`theme import` and `theme install` can no longer write outside
+  `~/.zem/themes/`.** The file name came from the theme's own `name` field
+  unchecked, so a theme calling itself `../../x` was written to `~/x.json`.
+  Names are now normalised (`My Theme` becomes `my_theme`) and limited to
+  letters, digits, `_` and `-`; the theme is validated before it is
+  written, and the command says what was wrong instead of "failed".
+- **Only `https://` URLs are fetched** by `theme install` and by the hint
+  spec registry (`hints search|install|update`); plain `http://` is accepted
+  for `localhost` only. Over http the SHA-256 in the index protected
+  against nothing, and `file://` would have read any file. Downloads are
+  also capped in size.
+
+### Changed
+- **Unknown keys in `config.json` are reported.** A misspelt key was
+  silently ignored; the shell now prints `warning: config.json: unknown key
+  'histroy' is ignored` at startup, and `config set` refuses a key the
+  schema does not know instead of writing it. Free-form sections
+  (`plugins.*`, `prompt.modules.*`) are unaffected.
 
 ## [0.12.8] - 2026-09-13
 ### Fixed
