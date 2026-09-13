@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.7] - 2026-09-13
 ### Fixed
 - **Parser conformance with POSIX** in the idioms people carry over from
   bash. A backslash inside double quotes now escapes only `$`, `"`, `\`,
