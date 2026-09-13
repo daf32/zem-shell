@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.2] - 2026-09-13
 ### Added
 - **`prompt` command**: `prompt list` draws every preset, `prompt set pure`
   switches to one, `prompt configure` asks a few questions with previews
