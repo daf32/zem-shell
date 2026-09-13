@@ -9,15 +9,16 @@
 ## Release
 
 <!--
-Branch name decides the release on merge:
+Every merge bumps the version and tags it. The branch name decides whether
+that tag is also published:
 
-  patch/ (and ci/, docs/, chore/, ...)  merge it, no release; the CHANGELOG
-                                        entry waits under "Unreleased"
-  minor/                                release what has accumulated
-  major/                                a milestone: "version 1", "version 2"
+  patch/ (and ci/, docs/, chore/, ...)  tag only, nothing published; the
+                                        CHANGELOG entry stays under "Unreleased"
+  minor/                                tag + release: GitHub and PyPI
+  major/                                the same, named as a milestone
 
 To ship something on its own, run the "Version bump" workflow by hand and
-pick the bump.
+pick the bump; a hand-run always publishes.
 -->
 
 ## Checklist

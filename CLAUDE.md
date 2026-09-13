@@ -15,23 +15,30 @@ unknown option instead of ignoring it. See `src/zem/main.py`.
 
 ## Releases
 
-Merging a PR into `main` does **not** release it by default. The PR's
-**branch name** decides (`.github/workflows/version-bump.yml`): `minor/`
-releases what has accumulated, `major/` is a milestone ("version 1"), and
-every other prefix — `patch/` included, and it stays the default — merges
-without releasing, leaving its CHANGELOG entry under `## [Unreleased]`.
-A release exists to hand someone a set of changes that makes a story, not
-to count merges. To ship a fix on its own, run the "Version bump" workflow
-by hand from the Actions tab and choose the bump. Never edit `version` in
-`pyproject.toml` by hand.
+Every merge into `main` is recorded: `version-bump.yml` bumps the version,
+commits it and tags it. **Not every tag is a release.** The PR's branch name
+decides whether the tag is published: `minor/` and `major/` build a GitHub
+Release and upload to PyPI, every other prefix — `patch/` included, and it
+stays the default — only tags. So a tag says "this is what main looked like
+after that merge", a release says "this is meant for people to install", and
+a published version therefore always ends in `.0`. The versions in between
+exist only in git, which is fine: nobody looking at PyPI can tell there was
+a gap. To ship a fix on its own, run the workflow by hand from the Actions
+tab and choose the bump; a hand-run always publishes. Never edit `version`
+in `pyproject.toml` by hand.
 
 A milestone (`X.0.0`) is named for the line it opens (`Zem 1.0`) rather
 than for its tag; there is no separate "stable release" object on GitHub,
 and freezing a line means a `vX.x` maintenance branch, which this project
 has no use for yet.
 
-Write user-facing changes into the `## [Unreleased]` section of `CHANGELOG.md`;
-the workflow renames it to the new version. When a branch is rebased after
+The CHANGELOG follows the same split: a tag-only bump leaves entries under
+`## [Unreleased]`, where they accumulate, and a release closes that section
+into the new version, so its notes cover everything since the previous
+release.
+
+Write user-facing changes into the `## [Unreleased]` section of `CHANGELOG.md`.
+When a branch is rebased after
 someone else's release, the entry tends to land inside the section that
 release just closed — CI now refuses that (`scripts/check_changelog.py`), but
 check it yourself when moving commits between branches.
