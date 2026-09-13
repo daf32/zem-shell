@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.12] - 2026-09-13
 ### Fixed
 - **A failed `&&` no longer swallows the rest of the line.** `make && ./run;
   cleanup` now runs `cleanup` when `make` fails, `false && a; b` runs `b`,
