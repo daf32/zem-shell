@@ -95,10 +95,20 @@ class Session:
         return self.wait_prompt(**kw)
 
     def output_of(self, line: str, **kw) -> str:
-        """What a command printed, without the echoed line and the prompt."""
+        """What a command printed, without the echoed line and the prompt.
+
+        The line is echoed more than once -- the tty echoes it as it is
+        typed and prompt_toolkit redraws it when it is accepted -- so the
+        output starts after the *last* `PROMPT line` pair, not the first.
+        """
         out = self.run(line, **kw)
-        body = out.split(line, 1)[-1]
-        return body.rsplit(PROMPT_SYMBOL, 1)[0].strip("\n ")
+        body = out.rsplit(PROMPT_SYMBOL, 1)[0]  # drop the prompt that follows
+        marker = f"{PROMPT_SYMBOL} {line}\n"
+        if marker in body:
+            body = body.rsplit(marker, 1)[-1]
+        else:  # a line the prompt wrapped or rewrote: fall back to the text
+            body = body.rsplit(line, 1)[-1]
+        return body.strip("\n ")
 
     def exit(self):
         self.child.sendline("exit")
