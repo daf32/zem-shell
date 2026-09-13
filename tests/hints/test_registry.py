@@ -115,9 +115,30 @@ def test_install_writes_the_file(http, tmp_path):
     assert not list(path.parent.glob("*.tmp"))
 
 
-def test_non_http_url_is_refused():
-    with pytest.raises(RegistryError, match="non-HTTP"):
-        registry_client._get("file:///etc/passwd")
+@pytest.mark.parametrize("url", [
+    "file:///etc/passwd",
+    "http://example.test/index.json",   # plain http: the checksum protects nothing
+    "ftp://example.test/index.json",
+])
+def test_unsafe_urls_are_refused(url):
+    with pytest.raises(RegistryError, match="only https"):
+        registry_client._get(url)
+
+
+def test_oversized_download_is_refused(monkeypatch):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self, n=-1):
+            return b"x" * n
+
+    monkeypatch.setattr(registry_client.urllib.request, "urlopen", lambda *a, **k: Response())
+    with pytest.raises(RegistryError, match="larger than"):
+        registry_client._get("https://example.test/index.json")
 
 
 # -- the builtin -----------------------------------------------------------

@@ -90,6 +90,7 @@ class Shell:
         self.file_history: ZemFileHistory | None = None
 
         if not headless:
+            self._warn_unknown_config_keys()
             self._setup_history()
             self._setup_prompt_session()
             self._setup_signal_handlers()
@@ -122,6 +123,18 @@ class Shell:
         new_attrs = termios.tcgetattr(self._tty_fd)
         new_attrs[3] = new_attrs[3] & ~termios.ECHOCTL
         termios.tcsetattr(self._tty_fd, termios.TCSANOW, new_attrs)
+
+    def _warn_unknown_config_keys(self):
+        """A misspelt key in config.json is ignored; say so once, at startup."""
+        from zem.config.settings import get_config_path, unknown_config_keys
+        from zem.config.store import read_raw
+
+        try:
+            unknown = unknown_config_keys(read_raw(get_config_path()))
+        except (OSError, ValueError):
+            return
+        for key in unknown:
+            sys.stderr.write(f"warning: config.json: unknown key '{key}' is ignored\n")
 
     def _sync_plugin_configs(self):
         """Sync default plugin configurations to the config file."""

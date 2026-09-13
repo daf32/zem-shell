@@ -213,7 +213,8 @@ Point Zem at your own with:
 config set hints.registry_url https://example.com/my-hints
 ```
 
-A registry is just a directory served over HTTPS:
+A registry is just a directory served over HTTPS (plain `http://` is
+accepted only for `localhost`, for trying a registry on your own machine):
 
 ```
 index.json          # {"schema_version": 1, "hints": [{name, command, description,

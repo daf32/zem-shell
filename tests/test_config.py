@@ -140,3 +140,41 @@ def test_unprefixed_environment_variables_are_ignored(monkeypatch):
 def test_zem_prefixed_environment_variables_apply(monkeypatch):
     monkeypatch.setenv("ZEM_ACTIVE_THEME", "nord")
     assert AppConfig().active_theme == "nord"
+
+
+def test_unknown_config_keys_are_reported_by_dotted_path():
+    from zem.config.settings import unknown_config_keys
+
+    data = {
+        "histroy": {"max_entries": 5},
+        "input": {"prompt": ">", "promt": ">"},
+        "plugins": {"weather": {"default_city": "Oslo"}},
+        "prompt": {"modules": {"git": {"format": "x"}}},
+        "colors": "not a section",
+    }
+    assert unknown_config_keys(data) == ["histroy", "input.promt"]
+
+
+def test_config_set_refuses_an_unknown_key(full_shell, run, monkeypatch, tmp_path):
+    path = tmp_path / "config.json"
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
+    write_raw(str(path), {})
+    code, _, err = run(full_shell, "config set nonexistent.key 1")
+    assert code == 1 and "unknown key 'nonexistent.key'" in err
+    assert "nonexistent" not in read_raw(str(path))
+    code, _, err = run(full_shell, "config set input.promt '>'")
+    assert code == 1 and "unknown key" in err
+    assert run(full_shell, "config set plugins.weather.default_city Oslo")[0] == 0
+    assert run(full_shell, "config set prompt.modules.git.format x")[0] == 0
+
+
+def test_shell_warns_about_unknown_keys_at_startup(
+    make_headless_shell, monkeypatch, tmp_path, capsys
+):
+    path = tmp_path / "config.json"
+    monkeypatch.setenv("ZEM_CONFIG_PATH", str(path))
+    write_raw(str(path), {"histroy": {"max_entries": 5}, "input": {"promt": ">"}})
+    shell = make_headless_shell()
+    shell._warn_unknown_config_keys()
+    err = capsys.readouterr().err
+    assert "unknown key 'histroy'" in err and "unknown key 'input.promt'" in err

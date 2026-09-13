@@ -119,7 +119,18 @@ class ConfigCommand(BaseCommand):
         return True
 
     def _set(self, context, path: str, key: str, value: Any, stdout, stderr) -> int:
+        from zem.config.settings import unknown_config_keys
         from zem.config.store import read_raw, write_raw
+
+        # A key the schema does not know would be written and then ignored
+        # forever; refuse it while the user is still looking.
+        probe: dict = {}
+        self._set_value(probe, key, value)
+        if unknown_config_keys(probe):
+            self._write_err(
+                f"config: unknown key '{key}' (see 'config list' for the keys)\n", stderr
+            )
+            return 1
 
         # Validate on a copy first so an invalid value never reaches disk.
         candidate = read_raw(path)
