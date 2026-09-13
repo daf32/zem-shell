@@ -54,6 +54,12 @@ Zem is a modular Python-based shell focused on extensibility and speed.
   repository. `prompt list` draws the presets, `prompt configure` walks you
   through it. See [docs/PROMPT.md](docs/PROMPT.md).
 
+- **Built out of its own plugin API**: `echo`, `printf`, `test`, `source`,
+  `eval`, `pushd`, `history`, `help`, the themes, the banner, `venv` — nine
+  bundled plugins, every one of them removable with `plugin disable`. The
+  core is the parser, the executor, job control, variables and the handful of
+  commands a shell cannot do without.
+
 - **Plugins**: a `Plugin` subclass — one file in `~/.zem/plugins/`, or a package
   with a `zem.plugins` entry point — can add commands, completion, themes and
   hooks that see every line before and after it runs. `plugin list` shows what

@@ -5,6 +5,18 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Changed
+- **`help` ships as a plugin**, finishing the split. Zem is now built out of
+  its own plugin API: nine bundled plugins (`coreutils`, `scripting`,
+  `dirstack`, `history`, `help`, `theme`, `logo`, `venv`, `weather`), all on
+  by default and all removable with `plugin disable`. What stays in the core
+  is the parser, the executor, job control, the variable model, `cd`/`pwd`/
+  `exit`, `alias`/`unalias`, and the four commands that manage the shell
+  itself (`config`, `plugin`, `hints`, `prompt`) — disable those and there
+  would be no way back.
+- The fallback `~/.zemrc` no longer writes `alias help='help'`, an alias of
+  a command to itself that did nothing.
+
 
 ## [0.12.5] - 2026-09-13
 ### Changed
