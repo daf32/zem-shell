@@ -5,6 +5,8 @@ All notable changes to Zem are documented here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.12.1] - 2026-09-13
 ### Fixed
 - `>&2` no longer creates a file named `&`. The parser understands file
   descriptor duplication in its general `N>&M` form, so `echo oops >&2`,
