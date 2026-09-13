@@ -35,12 +35,18 @@ class InputSettings(BaseModel):
     auto_suggest: bool = True  # fish-style ghost text from history
 
 class HistorySettings(BaseModel):
+    """One history, shared by the arrow keys, Ctrl-R, `!!` and `history`."""
+
     enable: bool = True
     file: str = Field(default_factory=lambda: os.path.expanduser("~/.zem_history"))
+    #: Entries kept in memory, and in the file when `rotate` is on.
     max_entries: int = Field(default=1000, ge=1)
+    #: Read the file when the shell starts; off means each session starts empty.
     load_on_start: bool = True
+    #: Write new entries to the file; off keeps this session's history in memory.
     save_on_exit: bool = True
-    rotate: bool = True  # truncate to max_entries on save
+    #: Trim the file to `max_entries` when the shell exits.
+    rotate: bool = True
     expand: bool = True  # `!!`, `!$`, `!N`, `!prefix` history expansion
 
 class RCSettings(BaseModel):
@@ -163,7 +169,11 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
         json_file=CONFIG_PATH,
         json_file_encoding='utf-8',
-        extra='ignore'
+        extra='ignore',
+        # Without a prefix every top-level section is read from the
+        # environment by name: a `PROMPT` or `INPUT` exported by the parent
+        # shell would be parsed as JSON and stop zem from starting.
+        env_prefix='ZEM_',
     )
 
     @classmethod

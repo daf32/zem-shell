@@ -33,9 +33,6 @@ from zem.utils.venv import activate_venv
 
 
 class Shell:
-    HISTORY_FILE = os.path.expanduser("~/.zem_history")
-    RC_FILE = os.path.expanduser("~/.zemrc")
-    
     def __init__(
         self,
         commands: Optional[Dict[str, BaseCommand]] = None,
@@ -85,8 +82,15 @@ class Shell:
         self.context._shell = self
         self._last_command_duration: Optional[float] = None  # Duration in seconds
         self._interrupted = False
+        #: Depth of `_execute_line` calls in progress; SIGINT is turned into
+        #: a `KeyboardInterrupt` only while a command runs (see
+        #: `_setup_signal_handlers`).
+        self._executing = 0
+        self._closed = False
+        self.file_history: ZemFileHistory | None = None
 
         if not headless:
+            self._setup_history()
             self._setup_prompt_session()
             self._setup_signal_handlers()
 
@@ -241,10 +245,30 @@ class Shell:
             'auto-suggestion': c.comment,
         })
 
+    def _setup_history(self):
+        """Open the history file and seed the in-memory history from it.
+
+        `context.history` is what `history`, `!!` and Ctrl-R see; the file
+        is what the arrow keys read and what survives the session. Both
+        start from the same entries so they agree from the first prompt.
+        """
+        cfg = self.config.history
+        if not cfg.enable:
+            return
+        self.file_history = ZemFileHistory(
+            cfg.file, load=cfg.load_on_start, persist=cfg.save_on_exit
+        )
+        if cfg.load_on_start:
+            try:
+                entries = self.file_history.entries()
+            except OSError:
+                entries = []
+            self.context.history = entries[-cfg.max_entries:]
+
     def _setup_prompt_session(self):
         """Setup prompt_toolkit session with history, lexer and completer."""
-        history = ZemFileHistory(self.history_file) if self.config.history.enable else None
-        
+        history = self.file_history
+
         # Build style from config colors
         self.style = self._build_style()
         
@@ -262,15 +286,9 @@ class Shell:
         async def _(event):
             from zem.ui.search import FuzzyHistorySearch
             
-            # Get history from session
-            history_items = []
-            if self.session.history:
-                history_items = list(self.session.history.get_strings())
-            
-            # Combine with in-memory context history (newest first for UI logic handling)
-            combined = history_items + self.context.history
-            
-            searcher = FuzzyHistorySearch(combined, self.config.colors)
+            # `context.history` was seeded from the file and grows with the
+            # session, so it is the one list to search.
+            searcher = FuzzyHistorySearch(list(self.context.history), self.config.colors)
             result = await searcher.run_async()
             
             if result:
@@ -303,6 +321,16 @@ class Shell:
 
     def _setup_signal_handlers(self):
         def sigint_handler(signum, frame):
+            # While a command runs, Ctrl-C must interrupt it: a builtin
+            # blocked in `read` or on the network, a `$(...)` being
+            # collected, a `wait`. External commands never get here (the
+            # terminal belongs to their process group). At the prompt the
+            # `c-c` key binding handles Ctrl-C; a SIGINT that still arrives
+            # there (`kill -INT`) only redraws the line.
+            if self._executing:
+                sys.stderr.write("\n")
+                sys.stderr.flush()
+                raise KeyboardInterrupt
             self._interrupted = True
             self._clear_current_line()
             try:
@@ -336,9 +364,21 @@ class Shell:
                 pass
 
     def _close_shell(self):
+        # Runs once: the SIGTERM handler calls it and then `sys.exit`, which
+        # lands in `run()`'s `finally` and would call it again.
+        if self._closed:
+            return
+        self._closed = True
+
         # Plugins get told first, while the shell is still whole.
         self.plugins.notify("on_exit", self)
         self._restore_terminal()
+
+        if self.file_history is not None and self.config.history.rotate:
+            try:
+                self.file_history.rotate(self.config.history.max_entries)
+            except OSError:
+                pass
 
         # Like bash: remaining jobs get SIGHUP (and SIGCONT so stopped ones
         # can act on it) before we tear the rest down.
@@ -491,14 +531,22 @@ class Shell:
 
         user_input = self.plugins.rewrite_line(user_input, self)
 
+        self._executing += 1
         try:
             self._execute_units(self._parser(user_input).iter_units())
+        except KeyboardInterrupt:
+            # Raised by the SIGINT handler while a builtin, a `$(...)` or a
+            # `wait` was running; the builtin runner maps its own case to
+            # 130, this catches what escaped between stages.
+            self.context.last_exit_code = 130
         except CLIError as e:
             self.context.last_exit_code = getattr(e, "exit_code", 1)
             self._print_error(str(e))
         except Exception as e:
             self.context.last_exit_code = 1
             self._print_error(f"internal error: {e}")
+        finally:
+            self._executing -= 1
 
         self.plugins.notify("post_exec", user_input, self.context.last_exit_code, self)
 
@@ -777,10 +825,14 @@ class Shell:
             while self.context.running:
                 try:
                     self._report_jobs()
+                    self._interrupted = False
                     try:
                         user_input = self._get_input()
 
                         if self._interrupted:
+                            # A SIGINT arrived while the line was being
+                            # edited (`kill -INT`): the line is discarded,
+                            # as after Ctrl-C.
                             self._interrupted = False
                             continue
 

@@ -183,6 +183,8 @@ zem-shell/
 
 The user-level configuration lives at `~/.config/zem/config.json`
 (or `$XDG_CONFIG_HOME/zem/config.json`). Override with `ZEM_CONFIG_PATH`.
+Any top-level key can also come from the environment under a `ZEM_` prefix
+(`ZEM_ACTIVE_THEME=nord zem`); sections take JSON.
 
 ## ⚙️ Configuration (`config.json`)
 
@@ -205,6 +207,9 @@ shows every key):
     },
     "history": {
         "max_entries": 1000,
+        "load_on_start": true,
+        "save_on_exit": true,
+        "rotate": true,
         "expand": true
     },
     "active_theme": "dracula"

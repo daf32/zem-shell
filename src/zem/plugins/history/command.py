@@ -24,9 +24,8 @@ class HistoryCommand(BaseCommand):
         """Clear in-memory history and, when available, the history file."""
         context.history = []
         shell = getattr(context, "_shell", None)
-        session = getattr(shell, "session", None)
-        file_history = getattr(session, "history", None)
-        if hasattr(file_history, "clear"):
+        file_history = getattr(shell, "file_history", None)
+        if file_history is not None:
             file_history.clear()
 
     def execute(

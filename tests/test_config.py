@@ -7,6 +7,7 @@ import threading
 
 import pytest
 
+from zem.config.settings import AppConfig
 from zem.config.store import read_raw, update_raw, write_raw
 
 
@@ -125,3 +126,17 @@ def test_format_validation_error():
         AppConfig.model_validate({"input": {"path_depth": -1}})
     lines = format_validation_error(info.value)
     assert len(lines) == 1 and lines[0].startswith("input.path_depth: ")
+
+
+def test_unprefixed_environment_variables_are_ignored(monkeypatch):
+    # `PROMPT` is exported by some zsh setups, `INPUT` by CI scripts; neither
+    # may stop the shell from starting.
+    monkeypatch.setenv("PROMPT", "not json")
+    monkeypatch.setenv("INPUT", "x")
+    monkeypatch.setenv("HISTORY", "{}")
+    assert AppConfig().input.prompt == "#"
+
+
+def test_zem_prefixed_environment_variables_apply(monkeypatch):
+    monkeypatch.setenv("ZEM_ACTIVE_THEME", "nord")
+    assert AppConfig().active_theme == "nord"
