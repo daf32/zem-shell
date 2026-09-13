@@ -115,9 +115,9 @@ Argument completion is declarative: JSON specs in `src/zem/hints/data/` (bundled
 
 Bundled specs cover tools almost everyone has; niche ones live in the separate [daf32/zem-hints](https://github.com/daf32/zem-hints) repository (specs in `hints/`, catalogue in `index.json`, validated in its own CI with `zem hints validate`) and are installed with `hints install`. Config section `hints` (`enable`, `dynamic`, `command_timeout_ms`, `cache_ttl_ms`, `user_dir`, `registry_url`). Tests: `tests/hints/`; the suite-wide `_no_hint_subprocess` fixture in `tests/conftest.py` stubs `sources.run_command` so no test depends on a real git/docker, and `tests/hints/conftest.py` overrides it. See `docs/HINT_SPECS.md`.
 
-### Themes (`src/zem/themes/`)
+### Themes (`src/zem/plugins/theme/themes/`)
 
-JSON files describing the `ColorScheme`. `ThemeManager` (in `utils/themes.py`) loads/validates them and applies via the `theme` builtin. Every theme JSON must define the `error` key — the lexer relies on it.
+JSON files describing the `ColorScheme`, shipped by the `theme` **plugin** rather than by the shell: `ThemeManager` carries no directory of its own and takes what `plugins.theme_dirs()` gives it, so `plugin disable theme` removes the command and the themes together. Every theme JSON must define the `error` key — the lexer relies on it.
 
 ### RC file & history
 
@@ -133,6 +133,10 @@ JSON files describing the `ColorScheme`. `ThemeManager` (in `utils/themes.py`) l
 Drop a file in `src/zem/builtins/` with a `BaseCommand` subclass — the filename becomes the command name, registration is automatic. For argument completion write a hint spec (`src/zem/hints/data/<name>.json`); `get_completer()` returning a `BaseArgCompleter` is the escape hatch for what a spec cannot express. If it's plugin-like and ships defaults, override `get_default_config()` and read them via `self.get_plugin_config(context)`.
 
 External plugins live in `~/.zem/plugins/` and follow the same pattern. They are loaded last and may override builtins by reusing the same command name.
+
+**What is a builtin and what is a plugin.** The core is the parser, the executor, job control, the variable model and the commands without which a shell is not a shell: `cd`, `pwd`, `exit`, `set`, `unset`, `export`, `get`, `jobs`/`fg`/`bg`/`kill`/`wait`/`disown`, plus `config` and `plugin` (turn those off and there is no way back). Everything optional ships as a plugin under `src/zem/plugins/`, a module or a package, listed by `plugin list` and switchable with `plugin disable`.
+
+Two traps when moving a command out to a plugin package: `__init_subclass__` derives the command name **from the filename**, so a class living in `plugins/theme/command.py` becomes the command `command` unless it declares `name` — and `.gitignore`'s `venv/` rule swallows a plugin directory called `venv`, so the package ships without it and nothing complains. `tests/test_plugins.py` guards both.
 
 ## Tests
 

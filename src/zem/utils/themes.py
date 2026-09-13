@@ -30,7 +30,8 @@ class ThemeManager:
     
     def __init__(self, config, extra_dirs=()):
         self.config = config
-        self._themes_dir = Path(__file__).parent.parent / "themes"
+        #: Themes ship with the `theme` plugin, which passes its directory
+        #: in through `extra_dirs`; the shell itself carries none.
         self._user_themes_dir = Path.home() / ".zem" / "themes"
         #: Directories contributed by plugins, between bundled and user.
         self._extra_dirs = [Path(p).expanduser() for p in extra_dirs]
@@ -39,8 +40,7 @@ class ThemeManager:
     
     def get_themes_dirs(self) -> List[Path]:
         """Get all theme directories, weakest first."""
-        dirs = [self._themes_dir]
-        dirs += [path for path in self._extra_dirs if path.exists()]
+        dirs = [path for path in self._extra_dirs if path.exists()]
         if self._user_themes_dir.exists():
             dirs.append(self._user_themes_dir)
         return dirs

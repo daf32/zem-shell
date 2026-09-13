@@ -114,6 +114,11 @@ celerybeat.pid
 .venv
 env/
 venv/
+# ...but the `venv` plugin is source, not an environment. Without this the
+# package silently ships without it. Only the sources: a broad `**` would
+# also un-ignore __pycache__.
+!src/zem/plugins/venv/
+!src/zem/plugins/venv/*.py
 ENV/
 env.bak/
 venv.bak/

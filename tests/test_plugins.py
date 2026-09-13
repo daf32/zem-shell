@@ -1,5 +1,6 @@
 """The plugin API: discovery, hooks, failure handling, and `plugin`."""
 
+import os
 import textwrap
 
 import pytest
@@ -430,3 +431,103 @@ def test_detection_without_the_installer_on_path(tmp_path, monkeypatch):
     monkeypatch.setattr(module.shutil, "which", lambda name: None)
     environment = module.detect_environment()
     assert not environment.can_install and "not on PATH" in environment.reason
+
+
+# -- what ships as a plugin ------------------------------------------------
+
+BUNDLED = ("theme", "logo", "venv", "weather")
+
+
+def test_bundled_plugins_are_all_present(plugin_shell):
+    names = {r.name for r in plugin_shell().plugins.loaded}
+    assert set(BUNDLED) <= names
+
+
+@pytest.mark.parametrize("name, command", [
+    ("theme", "theme"), ("logo", "logo"), ("venv", "venv"), ("weather", "weather"),
+])
+def test_a_bundled_plugin_provides_its_command(plugin_shell, name, command):
+    shell = plugin_shell()
+    assert command in shell.commands
+    record = next(r for r in shell.plugins.loaded if r.name == name)
+    assert not record.error
+
+
+def _shell_in_a_fresh_process(tmp_path, disabled, line):
+    """Run one line in a separate interpreter.
+
+    Disabling a plugin works by not importing it, and a module already
+    imported in this process stays imported — so the only honest way to
+    test it is a new process, which is also how a user meets it.
+    """
+    import json
+    import subprocess
+    import sys
+
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({
+        "disabled_plugins": disabled,
+        "rc": {"auto_create": False, "file": str(tmp_path / "zemrc")},
+        "history": {"enable": False, "file": str(tmp_path / "hist")},
+        "venv": {"auto": False},
+    }))
+    return subprocess.run(
+        [sys.executable, "-c",
+         "import sys; from zem.main import main; sys.exit(main(['-c', %r]))" % line],
+        capture_output=True, text=True, timeout=60,
+        env={**os.environ, "ZEM_CONFIG_PATH": str(config), "ZEM_HINTS_PATH": ""},
+    )
+
+
+@pytest.mark.parametrize("name", ["theme", "logo", "venv"])
+def test_disabling_a_bundled_plugin_removes_its_command(tmp_path, name):
+    present = _shell_in_a_fresh_process(tmp_path, [], f"type {name}")
+    assert present.returncode == 0, present.stderr
+
+    gone = _shell_in_a_fresh_process(tmp_path, [name], f"type {name}")
+    assert gone.returncode != 0
+    assert name in (gone.stdout + gone.stderr)
+
+
+def test_the_core_survives_every_plugin_being_off(tmp_path):
+    """The shell is still a shell with nothing optional loaded."""
+    result = _shell_in_a_fresh_process(
+        tmp_path, list(BUNDLED),
+        "cd /tmp && pwd && set X 1 && get X && jobs && type theme",
+    )
+    # `cd`, `pwd`, `set`, `get` and `jobs` all worked; only `type theme` failed.
+    assert "/tmp" in result.stdout and "1" in result.stdout
+    assert result.returncode != 0
+
+
+def test_themes_come_from_the_theme_plugin(plugin_shell, isolated_config):
+    from zem.utils.themes import ThemeManager
+
+    shell = plugin_shell()
+    manager = ThemeManager(shell.config, shell.plugins.theme_dirs())
+    assert "dracula" in manager.list_themes()
+
+    from zem.core.shell import Shell
+
+    isolated_config.disabled_plugins = ["theme"]
+    without = Shell(commands=None, config=isolated_config, headless=True,
+                    user_plugins_dir=None)
+    assert ThemeManager(isolated_config, without.plugins.theme_dirs()).list_themes() == {}
+
+
+def test_every_bundled_plugin_is_importable_from_the_package():
+    """A guard for packaging, not for logic.
+
+    `.gitignore` has a `venv/` rule for virtualenvs, and it silently
+    swallowed the `venv` plugin's directory — git never tracked it and the
+    wheel shipped without it. Nothing else would have noticed.
+    """
+    import importlib
+    import pkgutil
+
+    import zem.plugins
+
+    found = {info.name for info in pkgutil.iter_modules(zem.plugins.__path__)}
+    assert set(BUNDLED) <= found, f"missing from the package: {set(BUNDLED) - found}"
+    for name in BUNDLED:
+        importlib.import_module(f"zem.plugins.{name}")
