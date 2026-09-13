@@ -16,7 +16,8 @@ Zem is a modular Python-based shell focused on extensibility and speed.
 - **Interactive-shell syntax** (fish-like scope: no `if`/`for`/functions — run scripts with bash):
   - Pipelines `|`, logic `&&` `||` `;`, background `&`.
   - Quoting, backslash escapes, `$VAR`, `${VAR}`, `$?`, `$(...)` command substitution.
-  - Redirections `<` `>` `>>` `2>` `2>>` `2>&1` `&>`; `~` and `~user` expansion; globs.
+  - Redirections `<` `>` `>>` `2>` `2>>` `&>` `&>>` and descriptor
+    duplication `>&1` `>&2` `1>&2` `2>&1`; `~` and `~user` expansion; globs.
   - Line continuation (trailing `\`, open quote, trailing operator) and
     history expansion `!!` `!$` `!N` `!prefix`.
   - Aliases with parameters (`alias gc='git commit -m $1'`).

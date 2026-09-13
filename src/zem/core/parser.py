@@ -11,6 +11,10 @@ if TYPE_CHECKING:
 class Parser:
     NORMAL, SINGLE, DOUBLE, SUBST = range(4)
 
+    #: Descriptors an ``N>&M`` duplication may name; the executor wires up
+    #: stdout and stderr only.
+    DUP_FDS = ("1", "2")
+
     def __init__(
         self,
         text: str,
@@ -285,9 +289,9 @@ class Parser:
                         if text[i + 1:i + 1 + len(rem)] == rem:
                             op = self.config.operators.redirect_append
                             i += len(rem)
-                        elif fd_prefix == "2" and text[i + 1:i + 3] == "&1":
-                            op = "2>&1"
-                            i += 2
+                        elif text[i + 1:i + 2] == self.config.operators.background:
+                            # `>&M` / `N>&M`: duplicate a descriptor.
+                            op, i = self._read_fd_dup(text, i, fd_prefix or "1")
                             fd_prefix = ""
                     if fd_prefix == "2":
                         op = "2" + op
@@ -338,12 +342,46 @@ class Parser:
             tokens.append("".join(current))
         return tokens
     
+    def _read_fd_dup(self, text: str, i: int, src_fd: str) -> tuple[str, int]:
+        """Read the ``&M`` of an ``N>&M`` descriptor duplication.
+
+        ``text[i]`` is the ``>`` and ``text[i + 1]`` the ``&``; returns the
+        canonical ``"N>&M"`` token and the index of its last character.
+        Only stdout and stderr are wired up, so any other descriptor is a
+        parse error — better than the file named ``&`` that ``>&2`` used
+        to create.
+        """
+        j = i + 2
+        while j < len(text) and text[j].isdigit():
+            j += 1
+        dst_fd = text[i + 2:j]
+        rest = text[j:j + 1]
+        if not dst_fd:
+            raise ParseError(f"Missing file descriptor after '{src_fd}>&'")
+        if dst_fd not in self.DUP_FDS:
+            raise ParseError(
+                f"Unsupported file descriptor '{dst_fd}' in '{src_fd}>&{dst_fd}': "
+                "only 1 (stdout) and 2 (stderr) can be duplicated"
+            )
+        ops = self.config.operators
+        delimiters = (
+            ops.background,
+            ops.pipe,
+            ops.semicolon,
+            ops.comment,
+            ops.redirect_output,
+            ops.redirect_input,
+        )
+        if rest and not rest.isspace() and rest not in delimiters:
+            raise ParseError(f"Ambiguous redirect: '{src_fd}>&{dst_fd}{rest}'")
+        return f"{src_fd}>&{dst_fd}", j - 1
+
     def _extract_redirections(self, tokens: list[str]) -> tuple[list[str], dict]:
         """Split tokens into command words and a redirection spec.
 
         The spec has keys ``stdin_file``, ``stdout_file``, ``append``,
-        ``stderr_file``, ``stderr_append``, ``stderr_to_stdout`` and
-        ``background``.
+        ``stderr_file``, ``stderr_append``, ``stderr_to_stdout``,
+        ``stdout_to_stderr`` and ``background``.
         """
         out = self.config.operators.redirect_output
         app = self.config.operators.redirect_append
@@ -355,6 +393,7 @@ class Parser:
             "stderr_file": None,
             "stderr_append": False,
             "stderr_to_stdout": False,
+            "stdout_to_stderr": False,
             "background": False,
         }
 
@@ -379,8 +418,16 @@ class Parser:
                 spec["append"] = token == "&>>"
                 spec["stderr_to_stdout"] = True
                 i += 2
+            elif token in ("1>&1", "2>&2"):
+                # Duplicating a descriptor onto itself: nothing to wire up.
+                i += 1
             elif token == "2>&1":
                 spec["stderr_to_stdout"] = True
+                spec["stdout_to_stderr"] = False
+                i += 1
+            elif token == "1>&2":
+                spec["stdout_to_stderr"] = True
+                spec["stderr_to_stdout"] = False
                 i += 1
             elif token == self.config.operators.redirect_input:
                 spec["stdin_file"] = target(i, token)
